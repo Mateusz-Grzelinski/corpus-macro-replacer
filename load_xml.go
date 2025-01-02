@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path"
@@ -16,73 +15,37 @@ import (
 	"golang.org/x/text/transform"
 )
 
-func openDemo() {
-	// Open our xmlFile
-	filename := "demo.xml"
-	xmlFile, err := os.Open(filename)
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		fmt.Println(err)
+func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile string) {
+	// newMakro := LoadMakroFromCMKFile(makroFile)
+	handleCorpusFile(inputFile, outputFile, handleM1Makro)
+}
+
+func handleM1Makro(decoder *xml.Decoder, t xml.StartElement) xml.Token {
+	var oldMakro M1
+	e := decoder.DecodeElement(&oldMakro, &t)
+	if e != nil {
+		log.Fatal(e)
 	}
-
-	fmt.Println("Successfully Opened {filename}")
-
-	// defer the closing of our xmlFile so that we can parse it later on
-	defer xmlFile.Close()
+	return oldMakro
 }
 
-func openCorpus(filename string) {
-	xmlFile, err := os.Open(filename)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Printf("Successfully Opened %s\n", filename)
-	// defer the closing of our xmlFile so that we can parse it later on
-	defer xmlFile.Close()
-
-	xml.EscapeText(os.Stdout, []byte("\"Mateusz 'Grzeliński excaped!:)\n"))
-
-	fmt.Println()
-	s := `test '123'`
-	test := xml.StartElement{Name: xml.Name{Local: `test`}}
-	xml.NewEncoder(os.Stdout).EncodeElement(s, test)
-
-	byteValue, _ := io.ReadAll(xmlFile)
-	output, err := xml.Marshal(byteValue)
-	println(output)
-
-}
-
-type GenericElement struct {
-	XMLName  xml.Name
-	Attrs    []xml.Attr       `xml:",any,attr"`
-	Content  string           `xml:",chardata"`
-	Children []GenericElement `xml:",any"`
-}
-
-func modifyXMLTokenByToken(inputFile, outputFile, targetField, newValue string) error {
-	// Open the input file
+func handleCorpusFile(inputFile string, outputFile string, handler func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
+	targetField := "M1"
 	input, err := os.Open(inputFile)
 	if err != nil {
 		return fmt.Errorf("error opening input file: %w", err)
 	}
 	defer input.Close()
 
-	// Create the output file
 	output, err := os.Create(outputFile)
 	if err != nil {
 		return fmt.Errorf("error creating output file: %w", err)
 	}
 	defer output.Close()
 
-	// Create an XML decoder and encoder
 	decoder := xml.NewDecoder(input)
 	encoder := xml.NewEncoder(output)
-	encoder.Indent("", "  ")
 
-	// Walk through the XML
-	var inTargetElement, charDataVisited bool
 	for {
 		token, err := decoder.Token()
 		encoder.Flush()
@@ -95,51 +58,39 @@ func modifyXMLTokenByToken(inputFile, outputFile, targetField, newValue string) 
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			inTargetElement = t.Name.Local == targetField
-			if inTargetElement {
-				var m M1
-				e := decoder.DecodeElement(&m, &t)
-				if e != nil {
-					log.Fatal(e)
-				}
-				charDataVisited = false
-			}
-			encoder.EncodeToken(t)
-		case xml.EndElement:
-			if inTargetElement && !charDataVisited {
-				encoder.EncodeToken(xml.CharData(newValue))
-			}
 			if t.Name.Local == targetField {
-				inTargetElement = false
+				handleOut := handler(decoder, t)
+				if handleOut != nil {
+					encoder.Indent("", "  ") // each, weird.
+					// indentation is actually considered xml.CharData, so I do not know how to handle it
+					err = encoder.Encode(handleOut)
+					if err != nil {
+						log.Fatal(err)
+					}
+					encoder.Indent("", "")
+				}
+			} else {
+				encoder.EncodeToken(t)
 			}
-			encoder.EncodeToken(t)
-		case xml.CharData:
-			if inTargetElement {
-				t = xml.CharData(newValue)
-				charDataVisited = true
-			}
-			encoder.EncodeToken(t)
+		// case xml.CharData:
+		// 	charData := strings.TrimSpace(string(token.(xml.CharData)))
+		// 	encoder.EncodeToken(xml.CharData(charData))
 		default:
-			// Pass through other tokens
 			encoder.EncodeToken(t)
 		}
 	}
-
-	// Flush the encoder
 	return encoder.Flush()
 }
 
 type GenericAttribute struct { // Varijable
-	// Text string `xml:",chardata"`
 	DAT string `xml:"DAT,attr"`
 }
 
 type EmbeddedMakro struct {
 	XMLName           xml.Name `xml:"MSMA"`
 	EmbeddedMakroName string   `xml:"-"`
-	// Text    string   `xml:",chardata"`
-	DAT string `xml:"DAT,attr"`
-	MAK *M1    `xml:"MAK,omitempty"`
+	DAT               string   `xml:"DAT,attr"`
+	MAK               *M1      `xml:"MAK,omitempty"`
 }
 
 /*
@@ -155,8 +106,6 @@ Note: names come from Croatian language
 </M1>
 */
 type M1 struct {
-	// XMLName   xml.Name           `xml:"M1"`
-	// Text      string             `xml:",chardata"`
 	MakroName string             `xml:"MN,attr"`
 	Varijable GenericAttribute   `xml:"MSVA"`
 	Formule   *GenericAttribute  `xml:"MSFO,omitempty"`
@@ -165,30 +114,13 @@ type M1 struct {
 	Grupa     []GenericAttribute `xml:"MSGR,omitempty"`
 	Potrosni  []GenericAttribute `xml:"MSPO,omitempty"`
 	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
-	// Children  []GenericElement   `xml:",any,-"` // anything that we missed, usually empty
 }
 
-const CMKSeparator = `,`
-
-func loadMakroFromXML(inputFile string) error {
-	input, err := os.Open(inputFile)
-	if err != nil {
-		return fmt.Errorf("error opening input file: %w", err)
-	}
-	byteValue, _ := io.ReadAll(input)
-	var m M1
-	err = xml.Unmarshal(byteValue, &m)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// 	return fmt.Errorf("error opening input file: %w", err)
-	// }
-	fmt.Println(err)
-	return nil
-}
+const CMKLineSeparator = `,`
 
 var SectionRegex = regexp.MustCompile(`\[((\w+?)\d*)\]`)
 
-func appendSection(m *M1, currentSection string, currentSectionText strings.Builder) {
+func appendM1Section(m *M1, currentSection string, currentSectionText strings.Builder) {
 	switch strings.ToLower(currentSection) {
 	case "":
 	case "varijable":
@@ -208,7 +140,7 @@ func appendSection(m *M1, currentSection string, currentSectionText strings.Buil
 		scanner := bufio.NewScanner(strings.NewReader(embeddedMakro.DAT))
 		for scanner.Scan() {
 			line := scanner.Text()
-			nameAndValue := strings.Split(line, "=")
+			nameAndValue := strings.SplitN(line, "=", 2)
 			if strings.ToLower(currentSection) == "makro" && strings.ToLower(nameAndValue[0]) == "name" {
 				if len(nameAndValue) != 2 {
 					log.Fatalf("Error, I do not know how to handle this case. Is there '=' in file name? %s", line)
@@ -226,8 +158,8 @@ func appendSection(m *M1, currentSection string, currentSectionText strings.Buil
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
-func MakroFromFile(filename string) *M1 {
-	var initialMakro *M1 = partialMakroFromFile(path.Join(path.Dir(filename), filename))
+func LoadMakroFromCMKFile(inputFile string) *M1 {
+	var initialMakro *M1 = partialMakroFromFile(path.Join(path.Dir(inputFile), inputFile))
 
 	unprocessedMakros := map[string]bool{}
 	processedMacros := map[string]*M1{}
@@ -249,7 +181,7 @@ func MakroFromFile(filename string) *M1 {
 			break
 		}
 
-		var macro *M1 = partialMakroFromFile(path.Join(path.Dir(filename), macroToProcess+".CMK"))
+		var macro *M1 = partialMakroFromFile(path.Join(path.Dir(inputFile), macroToProcess+".CMK"))
 		processedMacros[macroToProcess] = macro
 
 		for _, subMacro := range macro.Makro {
@@ -314,16 +246,16 @@ func partialMakroFromFile(filename string) *M1 {
 			}
 			fullSectionName, sectionName := matched[1], matched[2]
 			allSections[fullSectionName]++
-			appendSection(m, currentSection, currentSectionText)
+			appendM1Section(m, currentSection, currentSectionText)
 			currentSectionText.Reset()
 			currentSection = sectionName
 		} else {
 			currentSectionText.WriteString(`"` + text + `"`)
-			currentSectionText.WriteString(CMKSeparator)
+			currentSectionText.WriteString(CMKLineSeparator)
 		}
 	}
 	if currentSectionText.Len() != 0 {
-		appendSection(m, currentSection, currentSectionText)
+		appendM1Section(m, currentSection, currentSectionText)
 	}
 	// m.Varijable = append(m.MSFO)
 	return m
@@ -357,7 +289,7 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 		oldVariables[nameValue[0]] = nameValue[1]
 	}
 
-	// load everythin related to new
+	// load everything related to new
 	newVariablesKeys := []string{}
 	newVariables := map[string]string{}
 	newVariablesComments := make(map[string][]string)
@@ -379,21 +311,21 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 	for _, name := range newVariablesKeys {
 		oldValue, ok := oldVariables[name]
 		if ok {
-			outputVarijable.WriteString(name + "=" + oldValue + CMKSeparator)
+			outputVarijable.WriteString(name + "=" + oldValue + CMKLineSeparator)
 		} else {
-			outputVarijable.WriteString(name + "=" + newVariables[name] + CMKSeparator)
+			outputVarijable.WriteString(name + "=" + newVariables[name] + CMKLineSeparator)
 		}
 		delete(newVariables, name)
 		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(`"` + comment + `"` + CMKSeparator)
+			outputVarijable.WriteString(comment + CMKLineSeparator)
 		}
 	}
 
 	// append missing new variables
 	for name, newValue := range newVariables {
-		outputVarijable.WriteString(name + "=" + newValue + CMKSeparator)
+		outputVarijable.WriteString(name + "=" + newValue + CMKLineSeparator)
 		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(`"` + comment + `"` + CMKSeparator)
+			outputVarijable.WriteString(comment + CMKLineSeparator)
 		}
 	}
 
@@ -405,22 +337,21 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 }
 
 func main() {
-	// openCorpus("Szablon biurowy prosty.E3D")
-	// modifyXMLTokenByToken(
-	// 	"Szablon biurowy prosty.E3D", "Szablon biurowy prosty.E3D.out.xml",
-	// 	"M1", "ala!!")
-	// loadMakroFromXML("M1.xml")
-	m := MakroFromFile(`C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`)
-	// fmt.Println(m)
-	fmt.Println("writing output!")
-	out, err := os.Create("out.xml")
-	if err != nil {
-		log.Fatal(err)
-	}
-	// enc := transform.NewWriter(out, charmap.Windows1250.NewDecoder())
-	mybytes, err := xml.MarshalIndent(&m, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	out.Write(mybytes)
+	// openCorpusE3D("Szablon biurowy prosty.E3D")
+	makroFile := `C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`
+	inputFile := `C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom.E3D`
+	outputFile := `C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_output.E3D`
+	replaceMakroInCorpusE3DFile(inputFile, outputFile, makroFile)
+	// m := LoadMakroFromCMKFile(makroFile)
+	// fmt.Println("writing output!")
+	// out, err := os.Create("out.xml")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// // enc := transform.NewWriter(out, charmap.Windows1250.NewDecoder())
+	// mybytes, err := xml.MarshalIndent(&m, "", "  ")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// out.Write(mybytes)
 }
