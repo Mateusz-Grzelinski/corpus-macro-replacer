@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -167,6 +168,8 @@ type M1 struct {
 	// Children  []GenericElement   `xml:",any,-"` // anything that we missed, usually empty
 }
 
+const CMKSeparator = `,`
+
 func loadMakroFromXML(inputFile string) error {
 	input, err := os.Open(inputFile)
 	if err != nil {
@@ -265,7 +268,7 @@ func MakroFromFile(filename string) *M1 {
 
 	}
 
-	for continueLoop := false; !continueLoop; {
+	for continueLoop := false; continueLoop; {
 		continueLoop = false
 		for _, macro := range resolveSubMakros {
 			for i, submacro := range macro.Makro {
@@ -289,7 +292,7 @@ func partialMakroFromFile(filename string) *M1 {
 	defer file.Close()
 
 	m := new(M1)
-	m.MakroName = strings.Split(filename, ".")[0] // this name might be wrong, it can be redefined in software
+	m.MakroName = strings.SplitN(filepath.Base(filename), ".", 2)[0] // this name might be wrong, it can be redefined in software
 	// true makro name is in MakroCollection.dat (binary file)
 
 	dec := transform.NewReader(file, charmap.Windows1250.NewDecoder())
@@ -301,10 +304,13 @@ func partialMakroFromFile(filename string) *M1 {
 
 	for scanner.Scan() {
 		text := scanner.Text()
+		if text == "" {
+			continue
+		}
 		if strings.HasPrefix(text, "[") {
 			matched := SectionRegex.FindStringSubmatch(text)
 			if matched == nil {
-				log.Fatalf("%s was parsed badly\n", text)
+				log.Fatalf("%s was parsed badly, I was looking for section name.\n", text)
 			}
 			fullSectionName, sectionName := matched[1], matched[2]
 			allSections[fullSectionName]++
@@ -312,8 +318,8 @@ func partialMakroFromFile(filename string) *M1 {
 			currentSectionText.Reset()
 			currentSection = sectionName
 		} else {
-			currentSectionText.WriteString(text)
-			currentSectionText.WriteString("\n")
+			currentSectionText.WriteString(`"` + text + `"`)
+			currentSectionText.WriteString(CMKSeparator)
 		}
 	}
 	if currentSectionText.Len() != 0 {
@@ -334,9 +340,9 @@ func partialMakroFromFile(filename string) *M1 {
 - todo handle case insensitive and global names: _VAR==VAR==var==vAr
 */
 func UpdateMakro(oldMacro *M1, newMacro *M1) {
+	// load everythin related to old
 	oldVariablesKeys := []string{}
 	oldVariables := map[string]string{}
-	// var oldVariablesComments map[string][]string = make(map[string][]string)
 	lastName := ""
 	for _, line := range strings.Split(oldMacro.Varijable.DAT, "\n") {
 		leadingWhiteCharTrimmed := strings.TrimSpace(line)
@@ -351,7 +357,7 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 		oldVariables[nameValue[0]] = nameValue[1]
 	}
 
-	// does not preserve order, but is easier to search
+	// load everythin related to new
 	newVariablesKeys := []string{}
 	newVariables := map[string]string{}
 	newVariablesComments := make(map[string][]string)
@@ -368,25 +374,26 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 		}
 	}
 
+	// combine old and new in "smart way"
 	var outputVarijable strings.Builder
 	for _, name := range newVariablesKeys {
 		oldValue, ok := oldVariables[name]
 		if ok {
-			outputVarijable.WriteString(name + "=" + oldValue + "\n")
+			outputVarijable.WriteString(name + "=" + oldValue + CMKSeparator)
 		} else {
-			outputVarijable.WriteString(name + "=" + newVariables[name] + "\n")
+			outputVarijable.WriteString(name + "=" + newVariables[name] + CMKSeparator)
 		}
 		delete(newVariables, name)
 		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(comment + "\n")
+			outputVarijable.WriteString(`"` + comment + `"` + CMKSeparator)
 		}
 	}
 
 	// append missing new variables
 	for name, newValue := range newVariables {
-		outputVarijable.WriteString(name + "=" + newValue + "\n")
+		outputVarijable.WriteString(name + "=" + newValue + CMKSeparator)
 		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(comment + "\n")
+			outputVarijable.WriteString(`"` + comment + `"` + CMKSeparator)
 		}
 	}
 
@@ -403,7 +410,7 @@ func main() {
 	// 	"Szablon biurowy prosty.E3D", "Szablon biurowy prosty.E3D.out.xml",
 	// 	"M1", "ala!!")
 	// loadMakroFromXML("M1.xml")
-	m := MakroFromFile("Nawierty_uniwersalne_28mm.CMK")
+	m := MakroFromFile(`C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`)
 	// fmt.Println(m)
 	fmt.Println("writing output!")
 	out, err := os.Create("out.xml")
