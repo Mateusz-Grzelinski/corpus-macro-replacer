@@ -1,5 +1,3 @@
-PL/ENG text below
-
 # Batch update makro for CORPUS
 
 This program performs batch update of macro for given models, but respects already existing `[VARIJABLE]` and `[JOINT]` sections. 
@@ -13,28 +11,76 @@ Input:
 Output:
 - updates all `.E3D` files that references `Nawierty_uniwersalne_28mm` and saves it in output dir
 
+# Usage
+
+Run from command line.
+
+```
+This program is used to update makro in Copus (.E3D) files. 
+It is alternative to doule ticks in macro editor that actually works: 
+- it does not edit [JOINT] section
+- does a smart merge on [VARIJABLE] section, see README
+
+Usage of C:\Users\grzel\go-projects\demo\src\__debug_bin3043078883.exe:
+  -alwaysConvertLocalToGlobal
+    	default: false. Global variable start with "_" prefix - it takes value from "evar". 
+    	Default logic allows adding "_" prefix to variables that consists only from integers (no if statements, no +-* operations). It prevents from erasing your custom logic.
+  -force
+    	default: false. Specify to override file specified in -output
+  -input string
+    	required. File or dir, must exist. If dir then changes macro recursively for all .E3D files.
+  -makro string
+    	required. Path to macro that should be replaced. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"
+  -minify
+    	default: false. Reduce file size by deleting spaces, (~7% size reduction)
+  -output string
+    	required. File or dir, does not need to exist. 
+    	If input is dir then output must be dir, but will be created if does not exist. Directory structure of input is mirrored.
+    	If input is file the output can be file (must end with .E3D) or directory.
+  -v	print version
+```
+
+Example output (multiple makros are read because the `custom.CMK` includes them in `[MAKRO1]` section):
+
+```bash
+❯ .\Corpus_Macro_Replacer.exe --force --input "C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro.E3D" --output "C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro_output.E3D" --makro "C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK"
+2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK'
+2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda.CMK'
+2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda_dodatkowa.CMK'
+2025/01/03 18:18:19 Reading Corpus file: 'C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro.E3D'
+2025/01/03 18:18:19 Done writing file  : 'C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro_output.E3D'
+2025/01/03 18:18:19   Updated 1 macros, 0 skipped
+```
+
+# Install
+
+Download from releases page https://github.com/Mateusz-Grzelinski/corpus-macro-replacer/releases
+
 ## Features
 
 Update old makro in smart way:
+
 - do not touch old JOINT section
-- do not touch old VARIJABLE, unless:
+- merge old and new VARIJABLE section:
 -- there is new variable (append new var to the end)
 -- reorder variable names the same as new makro
--- use comments from updated makro
--- not supported: deleting unused variable
+-- discard variables that are no longer present in new makro
+-- discard comments from old makro
 - discard other old sections (groupa, potrosni, makro, pila)
-- todo handle case insensitive and global names: _VAR==VAR==var==vAr
-- replace all other sections
+- names are not case sensitive: prefer names from new macro
+- convert local to global variables, watch for corner cases:
+-- todo
 
 # Corner cases
 
 This program edits Corpus files with external tool. ALWAYS MAKE A BACKUP!
 
-- watch out: 
--- .CMK files are usually encoded with `Windows 1250` 
--- `.E3D` files might be utf-8 with BOM (unclear)
+General points:
+
+- .CMK files are usually encoded with `Windows 1250` 
+- `.E3D` files might be utf-8 with BOM (unclear)
 - file name must be the same as makro name (settings from `MakroCollection.dat` are ignored)
-- makro file name extension must be `.CMD` (must be capitalized)
+- makro file extension must be `.CMD` (must be capitalized)
 
 Converting local variables to global (evar) variables might be not what you want:
 

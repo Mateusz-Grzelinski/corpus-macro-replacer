@@ -40,6 +40,7 @@ const (
 )
 
 type ProgramSettings struct {
-	minify                        bool
-	convertLocalVariablesToGlobal ConvertLocalVariablesToGlobal
+	minify                     bool
+	alwaysConvertLocalToGlobal bool
+	// convertLocalVariablesToGlobal ConvertLocalVariablesToGlobal
 }

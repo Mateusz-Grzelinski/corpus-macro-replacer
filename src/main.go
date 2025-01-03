@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var Settings ProgramSettings = ProgramSettings{minify: false, convertLocalVariablesToGlobal: Always}
+var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false}
 
 func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile string) {
 	newMakro := LoadMakroFromCMKFile(makroFile)
@@ -33,7 +33,7 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile 
 		}
 		if oldMakro.MakroName == newMakro.MakroName {
 			macrosUpdated++
-			UpdateMakro(&oldMakro, newMakro)
+			UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
 			return newMakro
 		} else {
 			macrosSkipped++
@@ -82,22 +82,40 @@ func main() {
 		fmt.Fprintln(w, `This program is used to update makro in Copus (.E3D) files. 
 It is alternative to doule ticks in macro editor that actually works: 
 - it does not edit [JOINT] section
-- does a smart merge on [VARIJABLE] section
+- does a smart merge on [VARIJABLE] section, see README
 `)
 		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	var input *string = flag.String("input", "", "file or dir, must exist. If dir then changes macro recursively for all .E3D files.")
-	var output *string = flag.String("output", "", `file or dir, does not need to exist. 
+	var version *bool = flag.Bool("v", false, "print version")
+	var input *string = flag.String("input", "", "required. File or dir, must exist. If dir then changes macro recursively for all .E3D files.")
+	var output *string = flag.String("output", "", `required. File or dir, does not need to exist. 
 If input is dir then output must be dir, but will be created if does not exist. Directory structure of input is mirrored.
 If input is file the output can be file (must end with .E3D) or directory.`)
-	var makroFile *string = flag.String("makro", "", `path to macro that should be replaced. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"`)
-	var force *bool = flag.Bool("force", false, `specify to override file specified in -output`)
-	var minify *bool = flag.Bool("minify", false, `reduce file size by deleting spaces, (~7% size reduction)`)
+	var makroFile *string = flag.String("makro", "", `required. Path to macro that should be replaced. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"`)
+	var force *bool = flag.Bool("force", false, `default: false. Specify to override file specified in -output`)
+	var minify *bool = flag.Bool("minify", false, `default: false. Reduce file size by deleting spaces, (~7% size reduction)`)
+	var alwaysConvertLocalToGlobal *bool = flag.Bool("alwaysConvertLocalToGlobal", false, `default: false. Global variable start with "_" prefix - it takes value from "evar". 
+Default logic allows adding "_" prefix to variables that consists only from integers (no if statements, no +-* operations). It prevents from erasing your custom logic.`)
 
 	flag.Parse()
 
+	if *version {
+		fmt.Println("Corpus_Macro_Replacer v0.1 (03.01.2025)")
+		os.Exit(0)
+	}
+	if *input == "" {
+		log.Fatalln("-input can not be empty")
+	}
+	if *output == "" {
+		log.Fatalln("-output can not be empty")
+	}
+	if *makroFile == "" {
+		log.Fatalln("-makroFile can not be empty")
+	}
+
 	Settings.minify = *minify
+	Settings.alwaysConvertLocalToGlobal = *alwaysConvertLocalToGlobal
 
 	statInput, errInput := os.Stat(*input)
 	if errInput != nil {

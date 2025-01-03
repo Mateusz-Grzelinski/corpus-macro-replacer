@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -28,7 +29,7 @@ func CMKFindOldName(oldVariablesNames []string, name string) (string, bool) {
 - discard other old sections (groupa, potrosni, makro, pila)
 - todo handle case insensitive and global names: _VAR==VAR==var==vAr
 */
-func UpdateMakro(oldMacro *M1, newMacro *M1) {
+func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) {
 	// load everything related to old
 	oldVariablesKeys := []string{} // not needed for now
 	lastName := ""
@@ -83,9 +84,19 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 		// one=4
 		// one=evar.one+20
 		// _one=4//4 is ignored
-		oldValue, ok := oldValues[oldName]
-		if ok {
-			outputVarijable.WriteString(encodeCMKLine(newName + "=" + oldValue))
+		oldValue, oldValueExists := oldValues[oldName]
+		if oldValueExists {
+			name := newName
+			if !strings.HasPrefix(oldName, `_`) && strings.HasPrefix(newName, `_`) {
+				if !alwaysConvertLocalToGlobal {
+					onlyDigits := regexp.MustCompile(`\d*`)
+					if !onlyDigits.Match([]byte(oldValue)) {
+						// old expression does not contain only digits, it is not allowed to be made global
+						name, _ = strings.CutPrefix(newName, `_`)
+					}
+				}
+			}
+			outputVarijable.WriteString(encodeCMKLine(name + "=" + oldValue))
 		} else {
 			outputVarijable.WriteString(encodeCMKLine(newName + "=" + newValues[newName]))
 		}
