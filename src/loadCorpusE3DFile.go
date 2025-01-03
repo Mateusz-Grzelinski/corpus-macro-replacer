@@ -18,7 +18,6 @@ func handleCorpusFile(inputFile string, outputFile string, minify bool, handleM1
 	}
 	defer input.Close()
 
-	// writer := bufio.NewReadWriter()
 	var encodedData bytes.Buffer
 	decoder := xml.NewDecoder(input)
 	encoder := xml.NewEncoder(&encodedData)
@@ -77,6 +76,6 @@ func handleCorpusFile(inputFile string, outputFile string, minify bool, handleM1
 	defer output.Close()
 
 	output.Write(encodedData.Bytes())
-	log.Printf("Done: '%s'", outputFile)
+	log.Printf("Done writing file  : '%s'", outputFile)
 	return nil
 }

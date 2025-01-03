@@ -45,7 +45,7 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 			oldVariablesKeys = append(oldVariablesKeys, lastName)
 			oldValues[lastName] = nameValue[1]
 		} else {
-			log.Printf("DEBUG: unknown line %s", line)
+			log.Printf("DEBUG: unknown line when updating macro: '%s'", line)
 		}
 	}
 
@@ -106,6 +106,6 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 
 	// old variables that no longer exist are discarded
 
-	newMacro.Varijable.DAT = outputVarijable.String()
+	newMacro.Varijable.DAT, _ = strings.CutSuffix(outputVarijable.String(), CMKLineSeparator)
 	newMacro.Joint = oldMacro.Joint
 }

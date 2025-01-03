@@ -3,10 +3,8 @@ package main
 import (
 	"bufio"
 	"encoding/xml"
-	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -56,6 +54,7 @@ type M1 struct {
 	Joint     *GenericAttribute  `xml:"MSJO,omitempty"`
 	Grupa     []GenericAttribute `xml:"MSGR,omitempty"`
 	Potrosni  []GenericAttribute `xml:"MSPO,omitempty"`
+	Raster    []GenericAttribute `xml:"MSRA,omitempty"`
 	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
 }
 
@@ -63,6 +62,8 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 	currentSectionText, _ := strings.CutSuffix(currentSectionTextBuilder.String(), CMKLineSeparator)
 	switch strings.ToLower(currentSection) {
 	case "":
+	case "raster":
+		m.Raster = append(m.Raster, GenericAttribute{DAT: currentSectionText})
 	case "varijable":
 		m.Varijable.DAT = currentSectionText
 	case "formule":
@@ -77,9 +78,8 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 		m.Potrosni = append(m.Potrosni, GenericAttribute{DAT: currentSectionText})
 	case "makro":
 		embeddedMakro := EmbeddedMakro{DAT: currentSectionText, MAK: nil}
-		scanner := bufio.NewScanner(strings.NewReader(embeddedMakro.DAT))
-		for scanner.Scan() {
-			line := scanner.Text()
+		for _, line := range strings.Split(currentSectionText, CMKLineSeparator) { // todo iterate
+			line = decodeCMKLine(line)
 			nameAndValue := strings.SplitN(line, "=", 2)
 			if strings.ToLower(currentSection) == "makro" && strings.ToLower(nameAndValue[0]) == "name" {
 				if len(nameAndValue) != 2 {
@@ -90,7 +90,7 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 		}
 		m.Makro = append(m.Makro, embeddedMakro)
 	default:
-		log.Printf("unknown section name: %s, sectionText: %s", currentSection, currentSectionText)
+		log.Printf("ERROR: unknown section name: '%s', sectionText: %s\n", currentSection, currentSectionText)
 	}
 
 }
@@ -100,8 +100,9 @@ const M1InitialMacroMarker string = ""
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
-func LoadMakroFromCMKFile(inputFile string) *M1 {
-	var initialMakro *M1 = partialLoadMakroFromCMKFile(path.Join(path.Dir(inputFile), inputFile))
+func LoadMakroFromCMKFile(makroFile string) *M1 {
+	makroFile, _ = filepath.Abs(makroFile)
+	var initialMakro *M1 = partialLoadMakroFromCMKFile(makroFile)
 
 	unprocessedMakros := map[string]bool{}
 	processedMacros := map[string]*M1{}
@@ -123,12 +124,12 @@ func LoadMakroFromCMKFile(inputFile string) *M1 {
 			break
 		}
 
-		var macro *M1 = partialLoadMakroFromCMKFile(path.Join(path.Dir(inputFile), macroToProcess+".CMK"))
+		submacroName := filepath.Join(filepath.Dir(makroFile), macroToProcess+".CMK")
+		var macro *M1 = partialLoadMakroFromCMKFile(submacroName)
 		processedMacros[macroToProcess] = macro
 
 		for _, subMacro := range macro.Makro {
-			val, ok := unprocessedMakros[subMacro.EmbeddedMakroName]
-			fmt.Print(val)
+			_, ok := unprocessedMakros[subMacro.EmbeddedMakroName]
 			if !ok {
 				unprocessedMakros[subMacro.EmbeddedMakroName] = false
 			}
@@ -139,10 +140,9 @@ func LoadMakroFromCMKFile(inputFile string) *M1 {
 	resolveSubMakros := map[string]*M1{M1InitialMacroMarker: initialMakro}
 	for name, macro := range processedMacros {
 		resolveSubMakros[name] = macro
-
 	}
 
-	for continueLoop := false; continueLoop; {
+	for continueLoop := true; continueLoop; {
 		continueLoop = false
 		for _, macro := range resolveSubMakros {
 			for i, submacro := range macro.Makro {
@@ -154,20 +154,29 @@ func LoadMakroFromCMKFile(inputFile string) *M1 {
 		}
 	}
 
+	// sanity checks
+	for _, macro := range resolveSubMakros {
+		for _, submacro := range macro.Makro {
+			if submacro.MAK == nil && submacro.EmbeddedMakroName != "" {
+				log.Printf("ERROR: Makro '%s' not loaded properly! This might be a bug.", submacro.EmbeddedMakroName)
+			}
+		}
+	}
+
 	return initialMakro
 }
 
 // same as MakroFromFile but might have unresolved data in m.makro
-func partialLoadMakroFromCMKFile(filename string) *M1 {
-	log.Printf("Reading makro: '%s'", filename)
-	file, err := os.Open(filename)
+func partialLoadMakroFromCMKFile(makroFile string) *M1 {
+	log.Printf("Reading makro: '%s'", makroFile)
+	file, err := os.Open(makroFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
 	m := new(M1)
-	m.MakroName = strings.SplitN(filepath.Base(filename), ".", 2)[0] // this name might be wrong, it can be redefined in software
+	m.MakroName = strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
 	// true makro name is in MakroCollection.dat (binary file)
 
 	dec := transform.NewReader(file, charmap.Windows1250.NewDecoder())

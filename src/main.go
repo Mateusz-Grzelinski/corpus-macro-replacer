@@ -15,19 +15,32 @@ var Settings ProgramSettings = ProgramSettings{minify: false, convertLocalVariab
 
 func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile string) {
 	newMakro := LoadMakroFromCMKFile(makroFile)
-	err := os.MkdirAll(filepath.Base(outputFile), os.ModePerm)
+
+	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
 		log.Fatalf("Can not create path: %s", outputFile)
 	}
+
+	macrosUpdated := 0
+	macrosSkipped := 0
 	handleCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
 		var oldMakro M1
+		decoder.Strict = true
 		e := decoder.DecodeElement(&oldMakro, &start)
+		decoder.Strict = false
 		if e != nil {
 			log.Fatal(e)
 		}
-		UpdateMakro(&oldMakro, newMakro)
-		return newMakro
+		if oldMakro.MakroName == newMakro.MakroName {
+			macrosUpdated++
+			UpdateMakro(&oldMakro, newMakro)
+			return newMakro
+		} else {
+			macrosSkipped++
+		}
+		return oldMakro
 	})
+	log.Printf("  Updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
 }
 
 func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makroFile string) {
@@ -68,8 +81,9 @@ func main() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintln(w, `This program is used to update makro in Copus (.E3D) files. 
 It is alternative to doule ticks in macro editor that actually works: 
-- it does not edit [JOINT] section and 
-- does a smart merge on [VARIJABLE] section`)
+- it does not edit [JOINT] section
+- does a smart merge on [VARIJABLE] section
+`)
 		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
@@ -79,15 +93,18 @@ If input is dir then output must be dir, but will be created if does not exist. 
 If input is file the output can be file (must end with .E3D) or directory.`)
 	var makroFile *string = flag.String("makro", "", `path to macro that should be replaced. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"`)
 	var force *bool = flag.Bool("force", false, `specify to override file specified in -output`)
+	var minify *bool = flag.Bool("minify", false, `reduce file size by deleting spaces, (~7% size reduction)`)
 
 	flag.Parse()
+
+	Settings.minify = *minify
 
 	statInput, errInput := os.Stat(*input)
 	if errInput != nil {
 		log.Fatalf("input '%s' is invalid: %s", *input, errInput)
 	}
 	statOutput, errOutput := os.Stat(*output)
-	if errOutput == nil && !*force {
+	if errOutput == nil && !statOutput.IsDir() && !*force {
 		log.Fatalf("output %s already exists. Add --force to override", *output)
 	}
 	if statInput.IsDir() {
