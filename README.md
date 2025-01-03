@@ -28,11 +28,50 @@ Update old makro in smart way:
 
 # Corner cases
 
+This program edits Corpus files with external tool. ALWAYS MAKE A BACKUP!
+
 - watch out: 
 -- .CMK files are usually encoded with `Windows 1250` 
 -- `.E3D` files might be utf-8 with BOM (unclear)
 - file name must be the same as makro name (settings from `MakroCollection.dat` are ignored)
 - makro file name extension must be `.CMD` (must be capitalized)
+
+Converting local variables to global (evar) variables might be not what you want:
+
+```
+[VARIJABLE] // old
+grubosc=18
+
+[VARIJABLE] // new
+_grubosc=18
+
+[VARIJABLE] // output
+_grubosc=18 // ok, now values is taken from global setting (18 is ignored)
+```
+
+```
+[VARIJABLE] // old
+grubosc=32 // modified
+
+[VARIJABLE] // new
+_grubosc=18
+
+[VARIJABLE] // output 
+grubosc=evar.grubosc+12 // ok, now values is taken from global setting but local modification is preserved
+```
+
+```
+[VARIJABLE] // old
+grubosc=obj1.gr
+
+[VARIJABLE] // new
+_grubosc=18 // ugh, you just lost old value. the actual value is taken from evar.grubosc
+
+[VARIJABLE] // output
+grubosc=evar.grubosc+obj1.gr // you can preserve it like this
+```
+
+
 
 # Testing
 

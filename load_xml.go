@@ -15,21 +15,65 @@ import (
 	"golang.org/x/text/transform"
 )
 
+type ConvertLocalVariablesToGlobal string
+
+const (
+	Always ConvertLocalVariablesToGlobal = "always"
+	OnlyIfValueIsTheSame
+	/*
+		{
+			[VARIJABLE] // old
+			grubosc=32
+
+			[VARIJABLE] // new
+			_grubosc=18
+
+			[VARIJABLE] // output
+			grubosc=32
+		}
+		note global value is ignored:
+		{
+			[VARIJABLE] // output
+			_grubosc=32 // 32 is ignored
+		}
+	*/
+	KeepLocal
+	/*
+		{
+			[VARIJABLE] // old
+			grubosc=if(sz>50;18;32)
+
+			[VARIJABLE] // new
+			_grubosc=18
+
+			[VARIJABLE] // output
+			grubosc=if(sz>50;18;32)
+		}
+	*/
+	KeepLocalIfHasCondition
+)
+
+type Settings struct {
+	minify                        bool
+	convertLocalVariablesToGlobal ConvertLocalVariablesToGlobal
+}
+
+var settings Settings = Settings{minify: false, convertLocalVariablesToGlobal: Always}
+
 func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile string) {
-	// newMakro := LoadMakroFromCMKFile(makroFile)
-	handleCorpusFile(inputFile, outputFile, handleM1Makro)
+	newMakro := LoadMakroFromCMKFile(makroFile)
+	handleCorpusFile(inputFile, outputFile, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
+		var oldMakro M1
+		e := decoder.DecodeElement(&oldMakro, &start)
+		if e != nil {
+			log.Fatal(e)
+		}
+		UpdateMakro(&oldMakro, newMakro)
+		return newMakro
+	})
 }
 
-func handleM1Makro(decoder *xml.Decoder, t xml.StartElement) xml.Token {
-	var oldMakro M1
-	e := decoder.DecodeElement(&oldMakro, &t)
-	if e != nil {
-		log.Fatal(e)
-	}
-	return oldMakro
-}
-
-func handleCorpusFile(inputFile string, outputFile string, handler func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
+func handleCorpusFile(inputFile string, outputFile string, handleM1 func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
 	targetField := "M1"
 	input, err := os.Open(inputFile)
 	if err != nil {
@@ -45,6 +89,7 @@ func handleCorpusFile(inputFile string, outputFile string, handler func(decoder 
 
 	decoder := xml.NewDecoder(input)
 	encoder := xml.NewEncoder(output)
+	encoder.Indent("", "")
 
 	for {
 		token, err := decoder.Token()
@@ -59,22 +104,28 @@ func handleCorpusFile(inputFile string, outputFile string, handler func(decoder 
 		switch t := token.(type) {
 		case xml.StartElement:
 			if t.Name.Local == targetField {
-				handleOut := handler(decoder, t)
+				handleOut := handleM1(decoder, t)
 				if handleOut != nil {
-					encoder.Indent("", "  ") // each, weird.
-					// indentation is actually considered xml.CharData, so I do not know how to handle it
+					if !settings.minify {
+						encoder.Indent("", "  ")
+						defer encoder.Indent("", "")
+					}
+					// indentation is actually considered xml.CharData, so pretty printing is actually modifying it
 					err = encoder.Encode(handleOut)
 					if err != nil {
 						log.Fatal(err)
 					}
-					encoder.Indent("", "")
 				}
 			} else {
 				encoder.EncodeToken(t)
 			}
-		// case xml.CharData:
-		// 	charData := strings.TrimSpace(string(token.(xml.CharData)))
-		// 	encoder.EncodeToken(xml.CharData(charData))
+		case xml.CharData:
+			if settings.minify {
+				charData := strings.TrimSpace(string(token.(xml.CharData))) // minify
+				encoder.EncodeToken(xml.CharData(charData))
+			} else {
+				encoder.EncodeToken(t)
+			}
 		default:
 			encoder.EncodeToken(t)
 		}
@@ -155,6 +206,8 @@ func appendM1Section(m *M1, currentSection string, currentSectionText strings.Bu
 
 }
 
+const M1InitialMacroMarker string = ""
+
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
@@ -194,7 +247,7 @@ func LoadMakroFromCMKFile(inputFile string) *M1 {
 	}
 
 	// make sure all macros are resolved. Follow topological sort
-	resolveSubMakros := map[string]*M1{"": initialMakro}
+	resolveSubMakros := map[string]*M1{M1InitialMacroMarker: initialMakro}
 	for name, macro := range processedMacros {
 		resolveSubMakros[name] = macro
 
@@ -250,8 +303,7 @@ func partialMakroFromFile(filename string) *M1 {
 			currentSectionText.Reset()
 			currentSection = sectionName
 		} else {
-			currentSectionText.WriteString(`"` + text + `"`)
-			currentSectionText.WriteString(CMKLineSeparator)
+			currentSectionText.WriteString(encodeCMKLine(text))
 		}
 	}
 	if currentSectionText.Len() != 0 {
@@ -259,6 +311,20 @@ func partialMakroFromFile(filename string) *M1 {
 	}
 	// m.Varijable = append(m.MSFO)
 	return m
+}
+
+func encodeCMKLine(text string) string {
+	if strings.Contains(text, " ") || strings.Contains(text, "\t") {
+		return `"` + text + `"` + CMKLineSeparator
+	}
+	return text + CMKLineSeparator
+}
+
+func decodeCMKLine(line string) string {
+	lineTrimmed := strings.TrimSpace(line)
+	lineTrimmed, _ = strings.CutPrefix(lineTrimmed, `"`)
+	lineTrimmed, _ = strings.CutSuffix(lineTrimmed, `"`)
+	return lineTrimmed
 }
 
 /*
@@ -272,13 +338,13 @@ func partialMakroFromFile(filename string) *M1 {
 - todo handle case insensitive and global names: _VAR==VAR==var==vAr
 */
 func UpdateMakro(oldMacro *M1, newMacro *M1) {
-	// load everythin related to old
-	oldVariablesKeys := []string{}
-	oldVariables := map[string]string{}
+	// load everything related to old
+	oldVariablesKeys := []string{} // not needed for now
 	lastName := ""
-	for _, line := range strings.Split(oldMacro.Varijable.DAT, "\n") {
-		leadingWhiteCharTrimmed := strings.TrimSpace(line)
-		isComment := strings.HasPrefix(leadingWhiteCharTrimmed, "//")
+	oldValues := map[string]string{}
+	for _, line := range strings.Split(oldMacro.Varijable.DAT, CMKLineSeparator) {
+		lineTrimmed := decodeCMKLine(line)
+		isComment := strings.HasPrefix(lineTrimmed, "//")
 		if isComment {
 			// discard old comments
 			continue
@@ -286,54 +352,78 @@ func UpdateMakro(oldMacro *M1, newMacro *M1) {
 		nameValue := strings.SplitN(line, "=", 2)
 		lastName = nameValue[0]
 		oldVariablesKeys = append(oldVariablesKeys, lastName)
-		oldVariables[nameValue[0]] = nameValue[1]
+		oldValues[nameValue[0]] = nameValue[1]
 	}
 
 	// load everything related to new
 	newVariablesKeys := []string{}
-	newVariables := map[string]string{}
-	newVariablesComments := make(map[string][]string)
+	newValues := map[string]string{}
+	newVariablesComments := map[string][]string{}
 	lastName = ""
-	for _, line := range strings.Split(oldMacro.Varijable.DAT, "\n") {
-		leadingWhiteCharTrimmed := strings.TrimSpace(line)
-		isComment := strings.HasPrefix(leadingWhiteCharTrimmed, "//")
+	for _, line := range strings.Split(oldMacro.Varijable.DAT, CMKLineSeparator) {
+		lineTrimmed := decodeCMKLine(line)
+		isComment := strings.HasPrefix(lineTrimmed, "//")
 		if isComment {
-			newVariablesComments[lastName] = append(newVariablesComments[lastName], line)
+			newVariablesComments[lastName] = append(newVariablesComments[lastName], lineTrimmed)
 		} else {
-			nameValue := strings.SplitN(line, "=", 2)
+			nameValue := strings.SplitN(lineTrimmed, "=", 2)
+			lastName = nameValue[0]
 			newVariablesKeys = append(newVariablesKeys, nameValue[0])
-			newVariables[nameValue[0]] = nameValue[1]
+			newValues[nameValue[0]] = nameValue[1]
 		}
 	}
 
 	// combine old and new in "smart way"
 	var outputVarijable strings.Builder
-	for _, name := range newVariablesKeys {
-		oldValue, ok := oldVariables[name]
+	// write initial comment
+	for _, line := range newVariablesComments[M1InitialMacroMarker] {
+		outputVarijable.WriteString(encodeCMKLine(line))
+	}
+	delete(newVariablesComments, M1InitialMacroMarker)
+	for _, newName := range newVariablesKeys {
+		oldName, _ := CMKFindOldName(oldVariablesKeys, newName)
+		// setting: convert local values to global: always; if value stays the same; convert to evar expression; Keep as is
+		// todo if oldValue is not integer, do not allow to convert it to global value
+		// one=4
+		// one=evar.one+20
+		// _one=4//4 is ignored
+		oldValue, ok := oldValues[oldName]
 		if ok {
-			outputVarijable.WriteString(name + "=" + oldValue + CMKLineSeparator)
+			outputVarijable.WriteString(encodeCMKLine(newName + "=" + oldValue))
 		} else {
-			outputVarijable.WriteString(name + "=" + newVariables[name] + CMKLineSeparator)
+			outputVarijable.WriteString(encodeCMKLine(newName + "=" + newValues[newName]))
 		}
-		delete(newVariables, name)
-		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(comment + CMKLineSeparator)
+		delete(newValues, newName)
+		for _, comment := range newVariablesComments[newName] {
+			outputVarijable.WriteString(encodeCMKLine(comment))
 		}
 	}
 
 	// append missing new variables
-	for name, newValue := range newVariables {
-		outputVarijable.WriteString(name + "=" + newValue + CMKLineSeparator)
+	for name, newValue := range newValues {
+		outputVarijable.WriteString(encodeCMKLine(name + "=" + newValue))
 		for _, comment := range newVariablesComments[name] {
-			outputVarijable.WriteString(comment + CMKLineSeparator)
+			outputVarijable.WriteString(encodeCMKLine(comment))
 		}
 	}
 
+	// old variables that no longer exist are discarded
+
 	newMacro.Varijable.DAT = outputVarijable.String()
 	newMacro.Joint = oldMacro.Joint
-	// outM := new(M1)
-	// copy(outM, newMacro)
-	// return outM
+}
+
+func CMKFindOldName(oldVariablesNames []string, name string) (string, bool) {
+	cleanupName, _ := strings.CutPrefix(name, "_")
+	cleanupName = strings.ToLower(cleanupName)
+	for index, possibleMatch := range oldVariablesNames {
+		cleanupPossibleMatch, _ := strings.CutPrefix(possibleMatch, "_")
+		cleanupPossibleMatch = strings.ToLower(cleanupPossibleMatch)
+		if cleanupName == possibleMatch {
+			return oldVariablesNames[index], true
+		}
+	}
+	return name, false
 }
 
 func main() {
