@@ -101,7 +101,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 	flag.Parse()
 
 	if *version {
-		fmt.Println("Corpus_Macro_Replacer v0.1 (03.01.2025)")
+		fmt.Println("Corpus_Macro_Replacer v0.2")
 		os.Exit(0)
 	}
 	if *input == "" {
