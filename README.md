@@ -83,6 +83,8 @@ Update specified makro in smart way:
 	- handle the case when `_` is appended to variable name, see option `-alwaysConvertLocalToGlobal`
 
 - discard other old sections (formule, grupa, potrosni, makro, pila), load sections from new version of file
+- update one file or all files in directory
+- does not override files unless `-force` is specified
 
 # Corner cases
 
