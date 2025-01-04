@@ -57,14 +57,11 @@ Usage of C:\Users\grzel\go-projects\demo\src\__debug_bin3043078883.exe:
   -v	print version
 ```
 
-To save output to file use this syntax (for later inspection):
+To save output to file (for later inspection) use this syntax:
 
 ```powershell
-poweshell> .\Corpus_Macro_Replacer.exe --<options ...> | Tee-Object "log.txt"
-cmd>  .\Corpus_Macro_Replacer.exe --<options ...> | tee "log.txt"
+.\Corpus_Macro_Replacer.exe --<options ...> | tee "log.txt"
 ```
-
-
 
 # Install
 
@@ -72,18 +69,20 @@ Download from releases page https://github.com/Mateusz-Grzelinski/corpus-macro-r
 
 ## Features
 
-Update old makro in smart way:
+Update specified makro in smart way:
 
-- do not touch old JOINT section
+- use old JOINT section
 - merge old and new VARIJABLE section:
--- there is new variable (append new var to the end)
--- reorder variable names the same as new makro
--- discard variables that are no longer present in new makro
--- discard comments from old makro
-- discard other old sections (groupa, potrosni, makro, pila)
-- names are not case sensitive: prefer names from new macro
-- convert local to global variables, watch for corner cases:
--- todo
+
+	- keep old values
+	- if there is new variable append it to the end of VARIJABLE
+	- discard variables that are no longer present in new makro
+	- reorder variable names the same as new makro
+	- discard old comments
+	- update name if it changes (variable names are not case sensitive)
+	- handle the case when `_` is appended to variable name, see option `-alwaysConvertLocalToGlobal`
+
+- discard other old sections (formule, grupa, potrosni, makro, pila), load sections from new version of file
 
 # Corner cases
 
@@ -96,7 +95,11 @@ General points:
 - file name must be the same as makro name (settings from `MakroCollection.dat` are ignored)
 - makro file extension must be `.CMD` (must be capitalized)
 
-Converting local variables to global (evar) variables might be not what you want:
+## Converting variable names from local to gloval
+
+Adding `_` to variable name cases it to become global (global variablers are also accessed via `evar`).
+
+Converting local variables to global (evar) variables might be not what you want - it will discard you local changes, see example below:
 
 ```
 [VARIJABLE] // old
@@ -131,8 +134,6 @@ _grubosc=18 // ugh, you just lost old value. the actual value is taken from evar
 grubosc=evar.grubosc+obj1.gr // you can preserve it like this
 ```
 
-
-
 # Testing
 
-Tested manually using Corpus 5.0
+Tested manually using Corpus 5.0.
