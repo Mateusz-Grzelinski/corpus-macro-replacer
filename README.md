@@ -15,7 +15,24 @@ Output:
 
 Run from command line.
 
+Example output (multiple makros are read because the `custom.CMK` includes them in `[MAKRO1]` section):
+
+```powershell
+❯ .\Corpus_Macro_Replacer.exe --force --input "C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro.E3D" --output "C:\Tri D 2025/01/04 20:50:29 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK'
+2025/01/04 20:50:29 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda.CMK'
+2025/01/04 20:50:29 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda_dodatkowa.CMK'
+2025/01/04 20:50:29 Reading Corpus file: 'C:\Users\grzel\go-projects\demo\playground\hello_xml\lewy_gorny.E3D.xml'
+2025/01/04 20:50:29   Cabinet 'simple_original_custom'
+2025/01/04 20:50:29     Updated 0 macros, 1 skipped in plate 'Wieniec_Gorny'
+2025/01/04 20:50:29     Updated 0 macros, 1 skipped in plate 'Bok_Lewy'
+2025/01/04 20:50:29   Summary: updated 0 macros, 2 skipped
+2025/01/04 20:50:29 Done writing file  : 'C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\lewy_gorny.E3D.xml'
 ```
+
+See all options:
+
+```powershell
+❯ .\Corpus_Macro_Replacer.exe --help
 This program is used to update makro in Copus (.E3D) files. 
 It is alternative to doule ticks in macro editor that actually works: 
 - it does not edit [JOINT] section
@@ -40,17 +57,14 @@ Usage of C:\Users\grzel\go-projects\demo\src\__debug_bin3043078883.exe:
   -v	print version
 ```
 
-Example output (multiple makros are read because the `custom.CMK` includes them in `[MAKRO1]` section):
+To save output to file use this syntax (for later inspection):
 
-```bash
-❯ .\Corpus_Macro_Replacer.exe --force --input "C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro.E3D" --output "C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro_output.E3D" --makro "C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK"
-2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK'
-2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda.CMK'
-2025/01/03 18:18:19 Reading makro: 'C:\Tri D Corpus\Corpus 5.0\Makro\Blenda_dodatkowa.CMK'
-2025/01/03 18:18:19 Reading Corpus file: 'C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro.E3D'
-2025/01/03 18:18:19 Done writing file  : 'C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\simple_original_custom_with_submacro_output.E3D'
-2025/01/03 18:18:19   Updated 1 macros, 0 skipped
+```powershell
+poweshell> .\Corpus_Macro_Replacer.exe --<options ...> | Tee-Object "log.txt"
+cmd>  .\Corpus_Macro_Replacer.exe --<options ...> | tee "log.txt"
 ```
+
+
 
 # Install
 
