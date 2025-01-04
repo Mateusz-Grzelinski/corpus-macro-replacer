@@ -77,6 +77,8 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) {
 		outputVarijable.WriteString(encodeCMKLine(line))
 	}
 	delete(newVariablesComments, M1InitialMacroMarker) // not really necessary
+
+	log.Println("Updating [VARIJABLE]")
 	for _, newName := range newVariablesKeys {
 		oldName, _ := CMKFindOldName(oldVariablesKeys, newName)
 		// setting: convert local values to global: always; if value stays the same; convert to evar expression; Keep as is
@@ -87,17 +89,26 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) {
 		oldValue, oldValueExists := oldValues[oldName]
 		if oldValueExists {
 			name := newName
+			convertedToGlobal := false
 			if !strings.HasPrefix(oldName, `_`) && strings.HasPrefix(newName, `_`) {
 				if !alwaysConvertLocalToGlobal {
 					onlyDigits := regexp.MustCompile(`\d*`)
 					if !onlyDigits.Match([]byte(oldValue)) {
 						// old expression does not contain only digits, it is not allowed to be made global
 						name, _ = strings.CutPrefix(newName, `_`)
+						convertedToGlobal = true
+						log.Printf("  Copied old value: '%s=%s' (was Local, now is global)\n", name, oldValue)
 					}
 				}
+				if !convertedToGlobal {
+					log.Printf("  Copied old value: '%s=%s' (was local, now is global)\n", name, oldValue)
+				}
+			} else if newValues[newName] != oldValue {
+				log.Printf("  Copied old value: '%s=%s'\n", name, oldValue)
 			}
 			outputVarijable.WriteString(encodeCMKLine(name + "=" + oldValue))
 		} else {
+			log.Printf("  Added  new value: '%s=...'\n", newName)
 			outputVarijable.WriteString(encodeCMKLine(newName + "=" + newValues[newName]))
 		}
 		delete(newValues, newName)
