@@ -8,10 +8,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
-var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false}
+var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true}
 
 func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile string) {
 	newMakro := LoadMakroFromCMKFile(makroFile)
@@ -32,19 +33,33 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile 
 			log.Fatal(err)
 		}
 		for _, element := range root.Element {
-			for _, elink := range element.Elinks {
-				for _, spoj := range elink.Spoj {
-					oldMakro := spoj.Makro1
-					if oldMakro.MakroName != newMakro.MakroName {
-						macrosSkipped++
-						continue
-					}
-					macrosUpdated++
-					UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+			visitedDaske := []string{}
+			updatedDaske := map[string]int{}
+			skippedDaske := map[string]int{}
+			for _, spoj := range element.Elinks.Spoj {
+				adIndex, _ := strconv.Atoi(spoj.O1.Value)
+				daske := element.Daske.AD[adIndex]
+				daskeName := daske.DName.Value
+				visitedDaske = append(visitedDaske, daskeName)
+				oldMakro := spoj.Makro1
+				if oldMakro.MakroName != newMakro.MakroName {
+					macrosSkipped++
+					skippedDaske[daskeName]++
+					continue
+				}
+				UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+				macrosUpdated++
+				updatedDaske[daskeName]++
+			}
+			if Settings.verbose {
+				log.Printf("  Cabinet '%s'\n", element.EName.Value)
+				for _, name := range visitedDaske {
+					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
 				}
 			}
 		}
-		log.Printf("  Updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
+		log.Printf("  Summary: updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
+
 		return root
 	})
 }

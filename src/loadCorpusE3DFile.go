@@ -25,8 +25,9 @@ type ElementFile struct {
 }
 type Element struct {
 	GenericNode
-	Daske  []Daske  `xml:"DASKE"`
-	Elinks []Elinks `xml:"ELINKS"`
+	EName  xml.Attr `xml:"ENAME,attr"`
+	Daske  Daske    `xml:"DASKE"`
+	Elinks Elinks   `xml:"ELINKS"`
 }
 type Daske struct {
 	GenericNode
@@ -35,7 +36,7 @@ type Daske struct {
 }
 type AD struct {
 	GenericNode
-	DName xml.Attr `xml:"DName,attr"`
+	DName xml.Attr `xml:"DNAME,attr"`
 }
 type Elinks struct {
 	GenericNode
@@ -43,7 +44,8 @@ type Elinks struct {
 }
 type Spoj struct {
 	GenericNode
-	O1DaskeIndex xml.Attr `xml:"O1,attr"`
+	/* index of: element.Daske.AD[O1] */
+	O1 xml.Attr `xml:"O1,attr"`
 	/* unknown */
 	O2 xml.Attr `xml:"O2,attr"`
 	/* unknown */
