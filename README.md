@@ -36,9 +36,9 @@ See all options:
 This program is used to update makro in Copus (.E3D) files. 
 It is alternative to doule ticks in macro editor that actually works: 
 - it does not edit [JOINT] section
-- does a smart merge on [VARIJABLE] section, see README
+- does a smart merge on [VARIJABLE] section, see README: https://github.com/Mateusz-Grzelinski/corpus-macro-replacer
 
-Usage of C:\Users\grzel\go-projects\demo\src\__debug_bin3043078883.exe:
+Usage of Corpus_Macro_Replacer.exe -input <PATH> -output <PATH> -makro <PATH>:
   -alwaysConvertLocalToGlobal
     	default: false. Global variable start with "_" prefix - it takes value from "evar". 
     	Default logic allows adding "_" prefix to variables that consists only from integers (no if statements, no +-* operations). It prevents from erasing your custom logic.
@@ -46,8 +46,8 @@ Usage of C:\Users\grzel\go-projects\demo\src\__debug_bin3043078883.exe:
     	default: false. Specify to override file specified in -output
   -input string
     	required. File or dir, must exist. If dir then changes macro recursively for all .E3D files.
-  -makro string
-    	required. Path to macro that should be replaced. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"
+  -makro value
+    	required. Path to macro that should be replaced. Can be specified multiple times. Usually one of files in "C:\Tri D Corpus\Corpus 5.0\Makro"
   -minify
     	default: false. Reduce file size by deleting spaces, (~7% size reduction)
   -output string
@@ -83,6 +83,7 @@ Update specified makro in smart way:
 	- handle the case when `_` is appended to variable name, see option `-alwaysConvertLocalToGlobal`
 
 - discard other old sections (formule, grupa, potrosni, makro, pila), load sections from new version of file
+- handle correctly nested macros
 - update one file or all files in directory
 - does not override files unless `-force` is specified
 
