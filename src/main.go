@@ -24,23 +24,29 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFile 
 	macrosUpdated := 0
 	macrosSkipped := 0
 	handleCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
-		var oldMakro M1
+		var root ElementFile
 		decoder.Strict = true
-		e := decoder.DecodeElement(&oldMakro, &start)
+		err := decoder.DecodeElement(&root, &start)
 		decoder.Strict = false
-		if e != nil {
-			log.Fatal(e)
+		if err != nil {
+			log.Fatal(err)
 		}
-		if oldMakro.MakroName == newMakro.MakroName {
-			macrosUpdated++
-			UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
-			return newMakro
-		} else {
-			macrosSkipped++
+		for _, element := range root.Element {
+			for _, elink := range element.Elinks {
+				for _, spoj := range elink.Spoj {
+					oldMakro := spoj.Makro1
+					if oldMakro.MakroName != newMakro.MakroName {
+						macrosSkipped++
+						continue
+					}
+					macrosUpdated++
+					UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+				}
+			}
 		}
-		return oldMakro
+		log.Printf("  Updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
+		return root
 	})
-	log.Printf("  Updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
 }
 
 func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makroFile string) {

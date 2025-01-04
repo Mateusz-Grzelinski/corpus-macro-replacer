@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/xml"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,47 +15,6 @@ import (
 const CMKLineSeparator = `,`
 
 var SectionRegex = regexp.MustCompile(`\[((\w+?)\d*)\]`)
-
-type GenericAttribute struct { // Varijable
-	DAT string `xml:"DAT,attr"`
-}
-
-type EmbeddedMakro struct {
-	XMLName           xml.Name `xml:"MSMA"`
-	EmbeddedMakroName string   `xml:"-"`
-	DAT               string   `xml:"DAT,attr"`
-	MAK               *M1      `xml:"MAK,omitempty"`
-}
-
-/*
-Represents makro as defined in Corpus 5.0 (reverse engineered).
-Help is available only in Corpus makro editor.
-
-Note: names come from Croatian language
-
-Example value:
-
-	{
-		<M1 MN="">
-			<MSVA DAT="WPUST_GLEBOKOSC=13,NUMER_NARZEDZIA=155"></MSVA>
-			<MSFO DAT="pila_grubosc=4"></MSFO>
-			<MSPI DAT="J=1,GB=if(typ_plecow=3;1;0),&#34;GN=frezowanie pila&#34;,GD=wpust_glebokosc,..."></MSPI>
-			<MSJO DAT="CONNECT=2345,mindistance=-16,maxdistance=10"></MSJO>
-		</M1>
-	}
-*/
-type M1 struct {
-	/* MN is not obligatory. Empty names means that makro is not save in any file. */
-	MakroName string             `xml:"MN,attr"`
-	Varijable GenericAttribute   `xml:"MSVA"`
-	Formule   *GenericAttribute  `xml:"MSFO,omitempty"`
-	Pila      []GenericAttribute `xml:"MSPI,omitempty"`
-	Joint     *GenericAttribute  `xml:"MSJO,omitempty"`
-	Grupa     []GenericAttribute `xml:"MSGR,omitempty"`
-	Potrosni  []GenericAttribute `xml:"MSPO,omitempty"`
-	Raster    []GenericAttribute `xml:"MSRA,omitempty"`
-	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
-}
 
 func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder strings.Builder) {
 	currentSectionText, _ := strings.CutSuffix(currentSectionTextBuilder.String(), CMKLineSeparator)

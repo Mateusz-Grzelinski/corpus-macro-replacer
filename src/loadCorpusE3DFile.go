@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 )
 
 type GenericNode struct {
@@ -14,10 +13,11 @@ type GenericNode struct {
 	Attr     []xml.Attr    `xml:",any,attr"`
 	Content  []GenericNode `xml:",any"`
 	Chardata string        `xml:",chardata"`
-	Comment  xml.Comment   `xml:",comment"`
+	// Comment  xml.Comment   `xml:",comment"`
 }
 
 type ElementFile struct {
+	XMLName xml.Name `xml:"ELEMENTFILE"`
 	GenericNode
 	FILE    xml.Attr  `xml:"FILE,attr"`
 	VER     xml.Attr  `xml:"VER,attr"`
@@ -47,10 +47,10 @@ type Spoj struct {
 	/* unknown */
 	O2 xml.Attr `xml:"O2,attr"`
 	/* unknown */
-	SP xml.Attr `xml:"SP,attr"`
-	// M1
-	/* unknown */
-	// M2
+	SP     xml.Attr `xml:"SP,attr"`
+	Makro1 M1       `xml:"M1"`
+	/* unknown, M2 seems to be unused */
+	Makro2 GenericNode `xml:"M2"`
 }
 
 type GenericAttribute struct { // Varijable
@@ -59,10 +59,10 @@ type GenericAttribute struct { // Varijable
 }
 
 type EmbeddedMakro struct {
-	XMLName           xml.Name `xml:"MSMA"`
-	EmbeddedMakroName string   `xml:"-"`
-	DAT               string   `xml:"DAT,attr"`
-	MAK               *M1      `xml:"MAK,omitempty"`
+	GenericNode
+	EmbeddedMakroName string `xml:"-"`
+	DAT               string `xml:"DAT,attr"`
+	MAK               *M1    `xml:"MAK,omitempty"`
 }
 
 /*
@@ -83,6 +83,7 @@ Example value:
 	}
 */
 type M1 struct {
+	GenericNode
 	/* MN is not obligatory. Empty names means that makro is not save in any file. */
 	MakroName string             `xml:"MN,attr"`
 	Varijable GenericAttribute   `xml:"MSVA"`
@@ -95,8 +96,19 @@ type M1 struct {
 	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
 }
 
-func handleCorpusFile(inputFile string, outputFile string, minify bool, handleM1 func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
-	targetField := "M1"
+type TrimmerDecoder struct {
+	decoder *xml.Decoder
+}
+
+func (tr TrimmerDecoder) Token() (xml.Token, error) {
+	t, err := tr.decoder.Token()
+	if cd, ok := t.(xml.CharData); ok {
+		t = xml.CharData(bytes.TrimSpace(cd))
+	}
+	return t, err
+}
+
+func handleCorpusFile(inputFile string, outputFile string, minify bool, handleRootElement func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {
@@ -105,10 +117,15 @@ func handleCorpusFile(inputFile string, outputFile string, minify bool, handleM1
 	defer input.Close()
 
 	var encodedData bytes.Buffer
-	decoder := xml.NewDecoder(input)
+	rawDecoder := xml.NewDecoder(input)
+	decoder := xml.NewTokenDecoder(TrimmerDecoder{rawDecoder})
 	encoder := xml.NewEncoder(&encodedData)
 	// indentation is actually considered xml.CharData, so pretty printing is actually modifying it
-	encoder.Indent("", "")
+	if !minify {
+		encoder.Indent("", "  ")
+	} else {
+		encoder.Indent("", "")
+	}
 
 	for {
 		token, err := decoder.Token()
@@ -121,30 +138,20 @@ func handleCorpusFile(inputFile string, outputFile string, minify bool, handleM1
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == targetField {
-				handleOut := handleM1(decoder, t)
+			if t.Name.Local == "ELEMENTFILE" {
+				handleOut := handleRootElement(decoder, t)
 				if handleOut != nil {
-					if !minify {
-						encoder.Indent("", "  ")
-					}
-					err = encoder.Encode(handleOut)
-					if err != nil {
+					if err = encoder.Encode(handleOut); err != nil {
 						log.Fatal(err)
-					}
-					if !minify {
-						encoder.Indent("", "")
 					}
 				}
 			} else {
 				encoder.EncodeToken(t)
 			}
 		case xml.CharData:
-			if minify {
-				charData := strings.TrimSpace(string(token.(xml.CharData)))
-				encoder.EncodeToken(xml.CharData(charData))
-			} else {
-				encoder.EncodeToken(t)
-			}
+			encoder.EncodeToken(t)
+		case xml.Comment:
+			encoder.EncodeToken(t)
 		default:
 			encoder.EncodeToken(t)
 		}

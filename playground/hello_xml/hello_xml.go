@@ -120,7 +120,8 @@ func main() {
 			fmt.Println("start element", token)
 			encoder.EncodeToken(t)
 		case xml.CharData:
-			fmt.Println("chardata!", token)
+			charData := strings.TrimSpace(string(token.(xml.CharData)))
+			fmt.Printf("chardata! '%s'\n", charData)
 			encoder.EncodeToken(t)
 		case xml.Comment:
 			fmt.Println("comment!", token)
