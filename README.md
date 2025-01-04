@@ -99,7 +99,7 @@ General points:
 
 Adding `_` to variable name cases it to become global (global variablers are also accessed via `evar`).
 
-Converting local variables to global (evar) variables might be not what you want - it will discard you local changes, see example below:
+Converting local variables to global (evar) variables might be not what you want - it will discard you local changes, see example below example 1:
 
 ```
 [VARIJABLE] // old
@@ -112,26 +112,39 @@ _grubosc=18
 _grubosc=18 // ok, now values is taken from global setting (18 is ignored)
 ```
 
+Example 2:
+
 ```
 [VARIJABLE] // old
 grubosc=32 // modified
 
 [VARIJABLE] // new
-_grubosc=18
+_grubosc=18 // note value 18 is ignored, the value is taken from evar.grubosc
 
-[VARIJABLE] // output 
+[VARIJABLE] // output: default behavior
+grubosc=32 // ok, now values is taken from global setting but local modification is preserved
+
+[VARIJABLE] // output when using -alwaysConvertLocalToGlobal
+_grubosc=32 // old value is preserved but actual value is taken from evar.grubosc
+
+[VARIJABLE] // Other option which is not impleneted
 grubosc=evar.grubosc+12 // ok, now values is taken from global setting but local modification is preserved
 ```
+
+Example 3:
 
 ```
 [VARIJABLE] // old
 grubosc=obj1.gr
 
 [VARIJABLE] // new
-_grubosc=18 // ugh, you just lost old value. the actual value is taken from evar.grubosc
+_grubosc=18
 
-[VARIJABLE] // output
-grubosc=evar.grubosc+obj1.gr // you can preserve it like this
+[VARIJABLE] // output: default behavior
+grubosc=obj1.gr
+
+[VARIJABLE] // output when using -alwaysConvertLocalToGlobal
+_grubosc=obj1.gr
 ```
 
 # Testing
