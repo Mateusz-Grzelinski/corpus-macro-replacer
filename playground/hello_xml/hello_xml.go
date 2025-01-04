@@ -88,6 +88,10 @@ func main() {
 
 	// Read the file content
 	byteValue := bufio.NewReader(xmlFile)
+	// write to memory
+	var buffer bytes.Buffer
+	encoder := xml.NewEncoder(&buffer)
+	encoder.Indent("", "  ")
 
 	// Unmarshal into the GenericNode struct
 	var root ElementFile
@@ -110,34 +114,38 @@ func main() {
 				if err != nil {
 					fmt.Println(err)
 				}
+				fmt.Println("root element", token)
+				encoder.Encode(&root)
 			}
-			// encoder.EncodeToken(t)
+			fmt.Println("start element", token)
+			encoder.EncodeToken(t)
 		case xml.CharData:
-			// encoder.EncodeToken(t)
+			fmt.Println("chardata!", token)
+			encoder.EncodeToken(t)
+		case xml.Comment:
+			fmt.Println("comment!", token)
+			encoder.EncodeToken(t)
 		default:
-			// encoder.EncodeToken(t)
+			fmt.Println("default!", token)
+			encoder.EncodeToken(t)
 		}
 	}
 	// err = xml.Unmarshal(byteValue, &root)
 	// iterateXMLTrimChardataSpaces(&root.GenericNode)
-	fmt.Println(root.Element[0].Elinks[0].Spoj)
-	if err != nil {
-		fmt.Println("Error unmarshalling XML:", err)
-		return
-	}
-
-	// Traverse and access attributes
-	// printNodeAttributes(root, 0)
+	// if err != nil {
+	// 	fmt.Println("Error unmarshalling XML:", err)
+	// 	return
+	// }
 
 	// Marshal back to XML
-	outputXML, err := xml.MarshalIndent(root, "", "  ")
-	if err != nil {
-		fmt.Println("Error marshalling XML:", err)
-		return
-	}
+	// outputXML, err := xml.MarshalIndent(root, "", "  ")
+	// if err != nil {
+	// 	fmt.Println("Error marshalling XML:", err)
+	// 	return
+	// }
 
 	// Save to output.xml
-	err = os.WriteFile("output.xml", outputXML, 0644)
+	err = os.WriteFile("output.xml", buffer.Bytes(), 0644)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
 		return
