@@ -116,7 +116,7 @@ Example 2:
 
 ```
 [VARIJABLE] // old
-grubosc=32 // modified
+grubosc=32
 
 [VARIJABLE] // new
 _grubosc=18 // note value 18 is ignored, the value is taken from evar.grubosc
@@ -127,7 +127,7 @@ grubosc=32 // ok, now values is taken from global setting but local modification
 [VARIJABLE] // output when using -alwaysConvertLocalToGlobal
 _grubosc=32 // old value is preserved but actual value is taken from evar.grubosc
 
-[VARIJABLE] // Other option which is not impleneted
+[VARIJABLE] // not impleneted: smart resolution
 grubosc=evar.grubosc+12 // ok, now values is taken from global setting but local modification is preserved
 ```
 
