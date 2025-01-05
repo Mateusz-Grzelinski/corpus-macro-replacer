@@ -125,7 +125,7 @@ grubosc=32
 _grubosc=18 // note value 18 is ignored, the value is taken from evar.grubosc
 
 [VARIJABLE] // output: default behavior
-grubosc=32 // ok, now values is taken from global setting but local modification is preserved
+grubosc=32
 
 [VARIJABLE] // output when using -alwaysConvertLocalToGlobal
 _grubosc=32 // old value is preserved but actual value is taken from evar.grubosc
@@ -153,3 +153,11 @@ _grubosc=obj1.gr
 # Testing
 
 Tested manually using Corpus 5.0.
+
+# License 
+
+Not set yet. If you make modifications you must share them with author.
+
+# Communication
+
+Use github issues: https://github.com/Mateusz-Grzelinski/corpus-macro-replacer/issues
