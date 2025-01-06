@@ -183,3 +183,11 @@ func decodeCMKLine(line string) string {
 	lineTrimmed, _ = strings.CutSuffix(lineTrimmed, `"`)
 	return lineTrimmed
 }
+
+func decodeAllCMKLines(DAT string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(DAT, CMKLineSeparator) {
+		lines = append(lines, decodeCMKLine(line))
+	}
+	return lines
+}

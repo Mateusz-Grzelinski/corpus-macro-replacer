@@ -40,7 +40,8 @@ type AD struct {
 }
 type Elinks struct {
 	GenericNode
-	Spoj []Spoj `xml:"SPOJ"`
+	COUNT xml.Attr `xml:"COUNT,attr"`
+	Spoj  []Spoj   `xml:"SPOJ"`
 }
 type Spoj struct {
 	GenericNode
@@ -110,7 +111,44 @@ func (tr TrimmerDecoder) Token() (xml.Token, error) {
 	return t, err
 }
 
-func handleCorpusFile(inputFile string, outputFile string, minify bool, handleRootElement func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
+func ReadCorpusFile(inputFile string) (*ElementFile, error) {
+	log.Printf("Reading Corpus file: '%s'", inputFile)
+	input, err := os.Open(inputFile)
+	if err != nil {
+		return nil, fmt.Errorf("error opening input file: %w", err)
+	}
+	defer input.Close()
+
+	rawDecoder := xml.NewDecoder(input)
+	decoder := xml.NewTokenDecoder(TrimmerDecoder{rawDecoder})
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, fmt.Errorf("error decoding XML: %w", err)
+		}
+
+		switch t := token.(type) {
+		case xml.StartElement:
+			if t.Name.Local == "ELEMENTFILE" {
+				var root *ElementFile = new(ElementFile)
+				decoder.Strict = true
+				err := decoder.DecodeElement(&root, &t)
+				decoder.Strict = false
+				if err != nil {
+					return nil, err
+				}
+				return root, nil
+			}
+		default:
+		}
+	}
+	return nil, fmt.Errorf("something went wrong when reading corpus file")
+}
+
+func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool, handleRootElement func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {

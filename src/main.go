@@ -14,7 +14,7 @@ import (
 
 var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true}
 
-func readAllMakros(makroFiles []string) map[string]*M1 {
+func readMakros(makroFiles []string) map[string]*M1 {
 	makrosToReplace := map[string]*M1{}
 	for _, makroFile := range makroFiles {
 		absPathMakroFile := strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
@@ -28,7 +28,7 @@ func readAllMakros(makroFiles []string) map[string]*M1 {
 }
 
 func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles []string) {
-	makrosToReplace := readAllMakros(makroFiles)
+	makrosToReplace := readMakros(makroFiles)
 
 	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
@@ -37,7 +37,7 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 
 	macrosUpdated := 0
 	macrosSkipped := 0
-	handleCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
+	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
 		var root ElementFile
 		decoder.Strict = true
 		err := decoder.DecodeElement(&root, &start)
@@ -147,6 +147,10 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 
 	if *version {
 		fmt.Println("Corpus_Macro_Replacer v0.2")
+		os.Exit(0)
+	}
+	if *input == "" && *output == "" && len(makroFiles) == 0 {
+		RunGui()
 		os.Exit(0)
 	}
 	if *input == "" {
