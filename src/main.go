@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+//go:generate fyne bundle -o src/bundled.go assets
+
 var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true}
 
 func readMakros(makroFiles []string) map[string]*M1 {
