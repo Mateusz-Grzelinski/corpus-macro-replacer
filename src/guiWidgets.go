@@ -24,8 +24,9 @@ type toolbarLabel struct {
 	*widget.Label
 }
 
-func NewToolbarLabel(label string) widget.ToolbarItem {
-	l := widget.NewLabelWithStyle(label, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+func NewToolbarLabel(label string) *toolbarLabel {
+	l := widget.NewLabelWithStyle(label, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	l.Truncation = fyne.TextTruncateClip
 	return &toolbarLabel{l}
 }
 

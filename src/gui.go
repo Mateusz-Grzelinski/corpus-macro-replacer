@@ -1,9 +1,13 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,114 +23,321 @@ import (
 )
 
 const CorpusFileBrowserDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
-const CorpusFileBrowserDefaultPath2 = `C:\Tri D Corpus\Corpus 5.0\elmsav\_modifications\ui\`
-const MacrosFileBrowserDefaultPath = `C:\Tri D Corpus\Corpus 5.0\Makro\`
 
-var loaddedFile *ElementFile
+var CorpusFileBrowserFreqentlyUsed = []string{
+	`C:\Tri D Corpus\Corpus 4.0\elmsav\`,
+	`C:\Tri D Corpus\Corpus 4.0\sobasav\`,
+	`C:\Tri D Corpus\Corpus 5.0\elmsav\`,
+	`C:\Tri D Corpus\Corpus 5.0\sobasav\`,
+	`C:\Tri D Corpus\Corpus 6.0\elmsav\`,
+	`C:\Tri D Corpus\Corpus 6.0\sobasav\`,
+}
+
+const MacrosDefaultPathNormal = `C:\Tri D Corpus\Corpus 5.0\Makro\`
+const MacrosDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
+
+var loaddedFileForPreview *ElementFile
+var selectedPath string
+var centerViewWithCorpusPreview *fyne.Container
+
+// var macrosToBeChanged []string = []string{}
+var loadedFiles []string = []string{}
+var ListOfLoadedFilesContainer *fyne.Container
+var outputPath string
+
+var DialogSize fyne.Size = fyne.NewSize(900, 600)
+
+func refreshListOfLoadedFiles() {
+	if ListOfLoadedFilesContainer == nil {
+		return
+	}
+	ListOfLoadedFilesContainer.RemoveAll()
+	listOfLoadedFiles := widget.NewList(
+		func() int {
+			return len(loadedFiles)
+		},
+		func() fyne.CanvasObject {
+			l := widget.NewLabel("")
+			// l.Wrapping = fyne.TextWrap
+			l.Truncation = fyne.TextTruncateEllipsis
+			l.Alignment = fyne.TextAlignLeading
+			return l
+		},
+		func(i widget.ListItemID, o fyne.CanvasObject) {
+			o.(*widget.Label).SetText(loadedFiles[i])
+		})
+	ListOfLoadedFilesContainer.Add(listOfLoadedFiles)
+}
 
 func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	parsedURL, err := url.Parse(string(uid))
 	if parsedURL.Scheme != "file" {
-		log.Println("URL scheme must be 'file'")
+		log.Println("URL scheme must be 'file'", uid)
 	}
 	path := parsedURL.Path
-	// path := storage.NewFileURI(uid).Path()
-	elementFile, err := ReadCorpusFile(path)
-	loaddedFile = elementFile
-	if err != nil {
-		log.Println(err)
+	selectedPath = path
+	stat, err := os.Stat(path)
+	if err == nil {
+		if !stat.IsDir() {
+			elementFile, err := ReadCorpusFile(path)
+			loaddedFileForPreview = elementFile
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+	if refreshCorpusPreviewFunc != nil {
+		refreshCorpusPreviewFunc()
 	}
 }
 
 func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
-	// nothingOpen := widget.NewLabel("No open files")
-	nothingOpen := xWidget.NewFileTree(storage.NewFileURI(CorpusFileBrowserDefaultPath2))
-	nothingOpen.OnSelected = CorpusFileTreeOnSelected
+	nothingOpen := widget.NewLabel("Brak otwartych plików!")
+	nothingOpen.Truncation = fyne.TextTruncateClip
+	nothingOpen.Alignment = fyne.TextAlignCenter
+
+	typical := widget.NewLabel("Typowe ścieżki:")
+	typical.Truncation = fyne.TextTruncateClip
+
 	var CorpusFileTreeContainer *fyne.Container
-	var openFilesButton *widget.Button = widget.NewButton("Otwórz katalog", func() {
+	var fileTree *xWidget.FileTree
+
+	defaultContainer := container.NewVBox(nothingOpen, typical)
+	for _, p := range CorpusFileBrowserFreqentlyUsed {
+		_, err := os.Stat(p)
+		if err == nil {
+			defaultContainer.Add(widget.NewButtonWithIcon(p, theme.FolderOpenIcon(), func() {
+				// pretty fat finger solution, duplicated below...
+				CorpusFileTreeContainer.Remove(fileTree)
+				fileTree = xWidget.NewFileTree(storage.NewFileURI(p))
+				fileTree.OnSelected = CorpusFileTreeOnSelected
+				fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+				CorpusFileTreeContainer.Remove(defaultContainer)
+				CorpusFileTreeContainer.Add(fileTree)
+				CorpusFileTreeContainer.Refresh()
+			}))
+		}
+	}
+	// CorpusFileTreeContainer = container.NewBorder(nil, nil, nil, nil, defaultContainer)
+	// nothingOpen := xWidget.NewFileTree(storage.NewFileURI(CorpusFileBrowserDefaultPath2))
+	// nothingOpen.OnSelected = CorpusFileTreeOnSelected
+	var openFilesButton *widget.Button = widget.NewButtonWithIcon("Otwórz katalog", theme.FolderOpenIcon(), func() {
 		folderDialog := dialog.NewFolderOpen(func(lu fyne.ListableURI, err error) {
 			if err != nil {
 				dialog.ShowError(err, *myWindow)
 				return
 			}
-			fmt.Println(lu)
 			if lu == nil {
 				return
 			}
-			fileTree := xWidget.NewFileTree(storage.NewFileURI(lu.Path()))
-			CorpusFileTreeContainer.Remove(nothingOpen)
+			CorpusFileTreeContainer.Remove(fileTree)
+			fileTree = xWidget.NewFileTree(storage.NewFileURI(lu.Path()))
+			fileTree.OnSelected = CorpusFileTreeOnSelected
+			fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+			CorpusFileTreeContainer.Remove(defaultContainer)
 			CorpusFileTreeContainer.Add(fileTree)
 			CorpusFileTreeContainer.Refresh()
-
 		}, *myWindow)
 
 		uri, err := storage.ParseURI(CorpusFileBrowserDefaultPath)
-		if err != nil {
+		if err == nil {
 			listable, err := storage.ListerForURI(uri)
-			if err != nil {
+			if err == nil {
 				folderDialog.SetLocation(listable)
 			}
 		}
+		folderDialog.Resize(DialogSize)
 		folderDialog.Show()
 	})
-	CorpusFileTreeContainer = container.NewBorder(openFilesButton, nil, nil, nil, nothingOpen)
+	CorpusFileTreeContainer = container.NewBorder(openFilesButton, nil, nil, nil, defaultContainer)
 
 	files := widget.NewAccordionItem("Pliki Corpusa", CorpusFileTreeContainer)
 	files.Open = true
-	// ---------------------------------------------------------------------------------------
-
-	// macroNothingOpen := xWidget.NewFileTree(storage.NewFileURI(MacrosFileBrowserDefaultPath))
-	// macros := widget.NewAccordionItem("Pliki Makro", macroNothingOpen)
-	// macros.Open = true
-
-	// accordion := widget.NewAccordion(
-	// files,
-	// macros,
-	// )
-	// accordion.MultiOpen = true // Allow multiple items to be open at the same time
-	// return container.NewStack(
-	// 	accordion,
-	// )
 	return CorpusFileTreeContainer
 }
 
+var MacrosToChange []*widget.Entry
+
+func getMacroName(path string) string {
+	base, found := strings.CutSuffix(path, ".CMK") // todo sla
+	if found {
+		return filepath.Base(base)
+	}
+	return filepath.Base(path)
+}
+
+var addMakroButton *widget.Button
+
 func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
-	item1 := widget.NewAccordionItem("Marka do zamiany", container.NewVBox(
-		container.NewBorder(nil, nil, nil,
-			widget.NewIcon(theme.DeleteIcon()),
-			// container.NewHBox(
-			widget.NewEntry(),
-			// ),
-			// widget.NewLabel("->"),
-			widget.NewEntry(),
+	macrosToChangeContainer := container.NewVBox()
+
+	addMakroButton = widget.NewButton("Dodaj makro", func() {
+		newMacroInput := widget.NewEntry()
+		newEntryLabel := widget.NewLabel("nic nie wybrano")
+		newMacroInput.SetPlaceHolder(`C:\Tri D Corpus\Corpus 5.0\Makro\Blenda.CMK`)
+		newMacroInput.OnChanged = func(path string) {
+			// parsedUri, err := storage.ParseURI(path)
+			// canRead, err := storage.CanRead(parsedUri)
+			stat, err := os.Stat(path)
+			if err == nil && stat != nil && !stat.IsDir() {
+				newEntryLabel.SetText(getMacroName(path))
+			} else {
+				newEntryLabel.SetText("Plik nie istnieje")
+			}
+			newEntryLabel.Refresh()
+		}
+		MacrosToChange = append(MacrosToChange, newMacroInput) // Add to the list
+		var row *fyne.Container
+		row = container.NewBorder(newEntryLabel, nil, nil,
+			container.NewHBox(
+				widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
+					fileOpenDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+						if err != nil {
+							dialog.ShowError(err, *myWindow)
+							return
+						}
+						path := reader.URI().Path()
+						newMacroInput.SetText(path)
+						newEntryLabel.SetText(getMacroName(path))
+						row.Refresh()
+					}, *myWindow)
+
+					uri, err := storage.ParseURI(MacrosDefaultPath)
+					if err == nil {
+						listable, err := storage.ListerForURI(uri)
+						if err == nil {
+							fileOpenDialog.SetLocation(listable)
+						}
+					}
+					fileOpenDialog.SetFilter(storage.NewExtensionFileFilter([]string{".CMK"}))
+					fileOpenDialog.Resize(DialogSize)
+					fileOpenDialog.Show()
+				}),
+				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+					macrosToChangeContainer.Remove(row)
+					macrosToChangeContainer.Refresh()
+				}),
+			),
+			newMacroInput,
+		)
+		macrosToChangeContainer.Add(row)
+	})
+	addMakroButton.OnTapped()
+
+	item1 := widget.NewAccordionItem("Makra do zamiany",
+		container.NewVBox(
+			addMakroButton,
+			macrosToChangeContainer,
 		),
-	// )
-	))
+	)
 	item1.Open = true
+	ListOfLoadedFilesContainer = container.NewBorder(nil, nil, nil, nil)
+	refreshListOfLoadedFiles()
+	// for _, f := range pathsToBeConverted {
+	// 	loadedFilesContainer.Add(widget.NewLabel(fmt.Sprintf("%s", f)))
+	// }
+	item2 := widget.NewAccordionItem(fmt.Sprintf("Wybrane pliki/foldery: %d", len(loadedFiles)), ListOfLoadedFilesContainer)
+	item2.Open = true
 	// item2 := widget.NewAccordionItem("Edytowane makra", widget.NewLabel("Szafki"))
 	// item3 := widget.NewAccordionItem("Filtruj formatki", widget.NewLabel("Formatki"))
 	// item4 := widget.NewAccordionItem("Ustawienia", widget.NewLabel("Formatki"))
-	accordion := widget.NewAccordion(item1)
+	accordion := widget.NewAccordion(item1, item2)
 	accordion.MultiOpen = true
 	return accordion
 }
 
-func AddMacro(con *fyne.Container, makro *M1) {
+func AddMacro(con *fyne.Container, oldMakro *M1) {
 	con.Add(container.NewHBox(
-		widget.NewCheck("", func(checked bool) {
-			return
-		}),
+		// widget.NewCheck("", func(checked bool) {
+		// 	return
+		// }),
 		// widget.NewIcon(theme.MenuDropDownIcon()),
-		widget.NewRichTextFromMarkdown(makro.MakroName),
+		widget.NewRichTextFromMarkdown(fmt.Sprintf("### %s", oldMakro.MakroName)),
 		// widget.NewIcon(theme.VisibilityIcon()),
-		widget.NewIcon(theme.DocumentSaveIcon()),
-		widget.NewIcon(theme.DocumentCreateIcon()),
+		// widget.NewIcon(theme.DocumentSaveIcon()),
+		widget.NewButtonWithIcon("Uaktualnij", theme.NavigateNextIcon(), func() {
+			macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, oldMakro.MakroName) + ".CMK"
+			for _, makroTochangeName := range MacrosToChange {
+				if makroTochangeName.Text == "" {
+					makroTochangeName.SetText(macroGuessedPath)
+					return
+				}
+			}
+			addMakroButton.OnTapped()
+			MacrosToChange[len(MacrosToChange)-1].SetText(macroGuessedPath)
+			if refreshCorpusPreviewFunc != nil {
+				refreshCorpusPreviewFunc()
+			}
+		}),
 	))
 
-	con.Add(widget.NewLabel("[VARIJABLE]"))
-	multiline := widget.NewMultiLineEntry()
-	multiline.SetText(strings.Join(decodeAllCMKLines(makro.Varijable.DAT), "\n"))
-	con.Add(multiline)
+	var newMakro *M1
+	for _, makroTochangeName := range MacrosToChange {
+		newMakroName := getMacroName(makroTochangeName.Text)
+		if oldMakro.MakroName == newMakroName {
+			makro, err := LoadMakroFromCMKFile(makroTochangeName.Text)
+			newMakro = makro
+			if err != nil {
+				log.Println(err)
+			}
+			break
+		}
+	} // C:\Tri D Corpus\Corpus 5.0\Makro\Zawieszki Standard Stolarz do HDF.CMK
+
+	if newMakro == nil {
+		{
+			textOld := strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n")
+			multilineOld := widget.NewRichTextWithText(textOld)
+			// multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.Add(widget.NewRichTextFromMarkdown("`[VARIJABLE]`"))
+			con.Add(multilineOld)
+		}
+		{
+			con.Add(widget.NewRichTextFromMarkdown("`[JOINT]`"))
+			var textOld string
+			if oldMakro.Joint != nil {
+				textOld = strings.Join(decodeAllCMKLines(cmp.Or(oldMakro.Joint.DAT, "")), "\n")
+			} else {
+				textOld = ""
+			}
+			multilineOld := widget.NewRichTextWithText(textOld)
+			// multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.Add(multilineOld)
+		}
+	} else {
+		{
+			textOld := strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n")
+			multilineOld := widget.NewRichTextWithText(textOld)
+			// multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			multilineNew := widget.NewMultiLineEntry()
+			textNew := strings.Join(decodeAllCMKLines(newMakro.Varijable.DAT), "\n")
+			multilineNew.SetText(textNew)
+			con.Add(widget.NewRichTextFromMarkdown("`[VARIJABLE]`"))
+			con.Add(container.NewHSplit(multilineOld, multilineNew))
+		}
+		{
+			var textOld string
+			if oldMakro.Joint != nil {
+				textOld = strings.Join(decodeAllCMKLines(oldMakro.Joint.DAT), "\n")
+			} else {
+				textOld = ""
+			}
+			multilineOld := widget.NewRichTextWithText(textOld)
+			// multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			multilineNew := widget.NewMultiLineEntry()
+			var textNew string
+			if newMakro.Joint != nil {
+				textNew = strings.Join(decodeAllCMKLines(newMakro.Joint.DAT), "\n")
+			} else {
+				textNew = ""
+			}
+			multilineNew.SetText(textNew)
+			con.Add(widget.NewRichTextFromMarkdown("`[JOINT]`"))
+			con.Add(container.NewHSplit(multilineOld, multilineNew))
+		}
+	}
+	con.Add(widget.NewRichTextFromMarkdown("`[FORMULE]`\n\nTodo: add button to show the rest"))
+	// con.Add(widget.NewRichTextFromMarkdown("`[FORMULE]`"))
 	// container.NewHSplit(
 	// container.NewVBox(
 	// multiline,
@@ -199,27 +410,58 @@ func AddElement(con *fyne.Container, element *Element) {
 	con.Add(widget.NewSeparator())
 }
 
-func getCenterPanel() *fyne.Container {
-	vBox := container.NewVBox()
-	toolbarLabel := NewToolbarLabel("Load file...")
-	topBar := widget.NewToolbar(
-		toolbarLabel,
-		widget.NewToolbarSpacer(),
-		NewToolbarButton("refresh", func() {
-			if loaddedFile == nil {
+var refreshCorpusPreviewFunc func()
+
+func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
+	refreshCorpusPreviewFunc = func() {
+		vBox.RemoveAll()
+		stat, err := os.Stat(selectedPath)
+		if err != nil {
+			l := widget.NewLabel(fmt.Sprintf("Nie można przeczytać '%s'\n: %s", selectedPath, err))
+			l.Wrapping = fyne.TextWrapWord
+			vBox.Add(l)
+		} else if stat.IsDir() {
+			// os.ReadDir(selectedPath)
+			l := widget.NewLabel(fmt.Sprintf("Wybrano katlog '%s'", selectedPath))
+			l.Wrapping = fyne.TextWrapWord
+			l2 := widget.NewLabel("Kliknij Dodaj aby wybrać wszystkie pliki w katalogu")
+			l3 := widget.NewLabel("Kliknij w plik aby otworzyć podgląd")
+			vBox.Add(l)
+			vBox.Add(l2)
+			vBox.Add(l3)
+		} else {
+			if loaddedFileForPreview == nil {
 				return
 			}
-			vBox.RemoveAll()
 			o := toolbarLabel.ToolbarObject()
 			var container *fyne.Container = o.(*fyne.Container)
 			headerLabel := container.Objects[1].(*widget.Label)
-			headerLabel.SetText("Plik: " + loaddedFile.FILE.Value)
-			fmt.Print(o)
-			for _, element := range loaddedFile.Element {
+			headerLabel.SetText("Podgląd: " + selectedPath)
+			// headerLabel.Wrapping = fyne.TextWrapWord
+			// headerLabel.Truncation = fyne.TextTruncateClip
+			for _, element := range loaddedFileForPreview.Element {
 				AddElement(vBox, &element)
 			}
+		}
+	}
+	return refreshCorpusPreviewFunc
+}
+
+func getCenterPanel() *fyne.Container {
+	vBox := container.NewVBox()
+	centerViewWithCorpusPreview = vBox // setting global reference, not ideal...
+	toolbarLabel := NewToolbarLabel("Wybierz plik aby podejrzeć")
+	topBar := widget.NewToolbar(
+		toolbarLabel,
+		widget.NewToolbarSpacer(),
+		NewToolbarButton("Wybierz", func() {
+			if selectedPath != "" && !slices.Contains(loadedFiles, selectedPath) {
+				loadedFiles = append(loadedFiles, selectedPath)
+			}
+			refreshListOfLoadedFiles()
 		}),
 	)
+	generateRefreshCorpusPreview(vBox, toolbarLabel)
 
 	scrollable := container.NewScroll(
 		vBox,
@@ -265,7 +507,6 @@ func RunGui() {
 		widget.NewToolbarSpacer(),
 		NewToolbarButton("Zamień Makra", func() {}),
 	)
-	fmt.Print(topBar)
 
 	left := getLeftPanel(&myWindow)
 	right := getRightPanel(&myWindow)

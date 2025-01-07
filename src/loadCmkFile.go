@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -41,7 +42,7 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 			nameAndValue := strings.SplitN(line, "=", 2)
 			if strings.ToLower(currentSection) == "makro" && strings.ToLower(nameAndValue[0]) == "name" {
 				if len(nameAndValue) != 2 {
-					log.Fatalf("Error, I do not know how to handle this case. Is there '=' in file name? %s", line)
+					log.Printf("Error, I do not know how to handle this case. Is there '=' in file name? %s", line)
 				}
 				embeddedMakro.EmbeddedMakroName = nameAndValue[1]
 			}
@@ -58,9 +59,12 @@ const M1InitialMacroMarker string = ""
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
-func LoadMakroFromCMKFile(makroFile string) *M1 {
+func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	makroFile, _ = filepath.Abs(makroFile)
-	var initialMakro *M1 = partialLoadMakroFromCMKFile(makroFile)
+	initialMakro, err := partialLoadMakroFromCMKFile(makroFile)
+	if err != nil {
+		return nil, err
+	}
 
 	unprocessedMakros := map[string]bool{}
 	processedMacros := map[string]*M1{}
@@ -83,7 +87,10 @@ func LoadMakroFromCMKFile(makroFile string) *M1 {
 		}
 
 		submacroName := filepath.Join(filepath.Dir(makroFile), macroToProcess+".CMK")
-		var macro *M1 = partialLoadMakroFromCMKFile(submacroName)
+		macro, err := partialLoadMakroFromCMKFile(submacroName)
+		if err != nil {
+			return nil, err
+		}
 		processedMacros[macroToProcess] = macro
 
 		for _, subMacro := range macro.Makro {
@@ -121,15 +128,15 @@ func LoadMakroFromCMKFile(makroFile string) *M1 {
 		}
 	}
 
-	return initialMakro
+	return initialMakro, nil
 }
 
 // same as MakroFromFile but might have unresolved data in m.makro
-func partialLoadMakroFromCMKFile(makroFile string) *M1 {
+func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	log.Printf("Reading makro: '%s'", makroFile)
 	file, err := os.Open(makroFile)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer file.Close()
 
@@ -152,7 +159,7 @@ func partialLoadMakroFromCMKFile(makroFile string) *M1 {
 		if strings.HasPrefix(text, "[") {
 			matched := SectionRegex.FindStringSubmatch(text)
 			if matched == nil {
-				log.Fatalf("%s was parsed badly, I was looking for section name.\n", text)
+				return nil, fmt.Errorf("%s was parsed badly, I was looking for section name.\n", text)
 			}
 			fullSectionName, sectionName := matched[1], matched[2]
 			allSections[fullSectionName]++
@@ -167,7 +174,7 @@ func partialLoadMakroFromCMKFile(makroFile string) *M1 {
 		appendM1Section(m, currentSection, currentSectionText)
 	}
 	// m.Varijable = append(m.MSFO)
-	return m
+	return m, nil
 }
 
 func encodeCMKLine(text string) string {

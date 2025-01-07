@@ -22,7 +22,11 @@ func readMakros(makroFiles []string) map[string]*M1 {
 		if exists {
 			log.Fatalf("Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
 		}
-		makrosToReplace[absPathMakroFile] = LoadMakroFromCMKFile(makroFile)
+		makro, err := LoadMakroFromCMKFile(makroFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		makrosToReplace[absPathMakroFile] = makro
 	}
 	return makrosToReplace
 }
