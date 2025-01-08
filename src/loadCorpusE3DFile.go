@@ -95,6 +95,7 @@ type M1 struct {
 	Joint     *GenericAttribute  `xml:"MSJO,omitempty"`
 	Grupa     []GenericAttribute `xml:"MSGR,omitempty"`
 	Potrosni  []GenericAttribute `xml:"MSPO,omitempty"`
+	Pocket    []GenericAttribute `xml:"MSPOCK,omitempty"`
 	Raster    []GenericAttribute `xml:"MSRA,omitempty"`
 	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
 }

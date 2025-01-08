@@ -19,6 +19,30 @@ func CMKFindOldName(oldVariablesNames []string, name string) (string, bool) {
 	return name, false
 }
 
+func loadValuesFromSection(DAT string) ([]string, map[string]string, map[string][]string) {
+	variablesKeys := []string{} // not needed for now
+	variablesComments := map[string][]string{}
+	lastName := ""
+	values := map[string]string{}
+	for _, line := range strings.Split(DAT, CMKLineSeparator) {
+		lineTrimmed := decodeCMKLine(line)
+		isComment := strings.HasPrefix(lineTrimmed, "//")
+		if isComment {
+			variablesComments[lastName] = append(variablesComments[lastName], lineTrimmed)
+		} else if strings.Contains(lineTrimmed, "=") {
+			nameValue := strings.SplitN(lineTrimmed, "=", 2)
+			lastName = nameValue[0]
+			variablesKeys = append(variablesKeys, lastName)
+			values[lastName] = nameValue[1]
+		} else {
+			log.Printf("DEBUG: unknown line when updating macro: '%s'", line)
+		}
+	}
+	return variablesKeys, values, variablesComments
+}
+
+var onlyDigits = regexp.MustCompile(`\d*`)
+
 /*
 	Update old makro in smart way. Modifies newMacro in place
 
@@ -30,45 +54,8 @@ func CMKFindOldName(oldVariablesNames []string, name string) (string, bool) {
 - todo handle case insensitive and global names: _VAR==VAR==var==vAr
 */
 func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) {
-	// load everything related to old
-	oldVariablesKeys := []string{} // not needed for now
-	lastName := ""
-	oldValues := map[string]string{}
-	for _, line := range strings.Split(oldMacro.Varijable.DAT, CMKLineSeparator) {
-		lineTrimmed := decodeCMKLine(line)
-		isComment := strings.HasPrefix(lineTrimmed, "//")
-		if isComment {
-			// discard old comments
-			continue
-		} else if strings.Contains(lineTrimmed, "=") {
-			nameValue := strings.SplitN(lineTrimmed, "=", 2)
-			lastName = nameValue[0]
-			oldVariablesKeys = append(oldVariablesKeys, lastName)
-			oldValues[lastName] = nameValue[1]
-		} else {
-			log.Printf("DEBUG: unknown line when updating macro: '%s'", line)
-		}
-	}
-
-	// load everything related to new
-	newVariablesKeys := []string{}
-	newValues := map[string]string{}
-	newVariablesComments := map[string][]string{}
-	lastName = ""
-	for i, line := range strings.Split(newMacro.Varijable.DAT, CMKLineSeparator) {
-		lineTrimmed := decodeCMKLine(line)
-		isComment := strings.HasPrefix(lineTrimmed, "//")
-		if isComment {
-			newVariablesComments[lastName] = append(newVariablesComments[lastName], lineTrimmed)
-		} else if strings.Contains(lineTrimmed, "=") {
-			nameValue := strings.SplitN(lineTrimmed, "=", 2)
-			lastName = nameValue[0]
-			newVariablesKeys = append(newVariablesKeys, nameValue[0])
-			newValues[lastName] = nameValue[1]
-		} else {
-			log.Printf("DEBUG: unknown line: %s in index %d, %s", line, i, newMacro.Varijable.DAT)
-		}
-	}
+	oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
+	newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newMacro.Varijable.DAT)
 
 	// combine old and new in "smart way"
 	var outputVarijable strings.Builder
@@ -92,7 +79,6 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) {
 			convertedToGlobal := false
 			if !strings.HasPrefix(oldName, `_`) && strings.HasPrefix(newName, `_`) {
 				if !alwaysConvertLocalToGlobal {
-					onlyDigits := regexp.MustCompile(`\d*`)
 					if !onlyDigits.Match([]byte(oldValue)) {
 						// old expression does not contain only digits, it is not allowed to be made global
 						name, _ = strings.CutPrefix(newName, `_`)

@@ -35,6 +35,8 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 		m.Grupa = append(m.Grupa, GenericAttribute{DAT: currentSectionText})
 	case "potrosni":
 		m.Potrosni = append(m.Potrosni, GenericAttribute{DAT: currentSectionText})
+	case "pocket":
+		m.Pocket = append(m.Pocket, GenericAttribute{DAT: currentSectionText})
 	case "makro":
 		embeddedMakro := EmbeddedMakro{DAT: currentSectionText, MAK: nil}
 		for _, line := range strings.Split(currentSectionText, CMKLineSeparator) { // todo iterate

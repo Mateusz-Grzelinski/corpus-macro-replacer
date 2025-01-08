@@ -68,6 +68,10 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 					continue
 				}
 				UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+
+				// todo reorder variables so that ones with the same name are next to each other
+				// oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
+				// newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newMacro.Varijable.DAT)
 				macrosUpdated++
 				updatedDaske[daskeName]++
 			}

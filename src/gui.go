@@ -38,7 +38,7 @@ const MacrosDefaultPathNormal = `C:\Tri D Corpus\Corpus 5.0\Makro\`
 const MacrosDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
 
 var loaddedFileForPreview *ElementFile
-var selectedPath string
+var SelectedPath string
 var centerViewWithCorpusPreview *fyne.Container
 
 // var macrosToBeChanged []string = []string{}
@@ -74,7 +74,9 @@ func refreshListOfLoadedFiles() {
 			l.Alignment = fyne.TextAlignLeading
 			return container.NewBorder(nil, nil,
 				widget.NewIcon(theme.FileIcon()),
-				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {}),
+				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+					refreshCorpusPreviewFunc()
+				}),
 				l,
 			)
 		},
@@ -101,11 +103,11 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 		log.Println("URL scheme must be 'file'", uid)
 	}
 	path := parsedURL.Path
-	selectedPath = parsedURL.Host + path
-	stat, err := os.Stat(selectedPath)
+	SelectedPath = parsedURL.Host + path
+	stat, err := os.Stat(SelectedPath)
 	if err == nil {
 		if !stat.IsDir() {
-			elementFile, err := ReadCorpusFile(path)
+			elementFile, err := ReadCorpusFile(SelectedPath)
 			loaddedFileForPreview = elementFile
 			if err != nil {
 				log.Println(err)
@@ -243,6 +245,7 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 					macrosToChangeContainer.Remove(row)
 					macrosToChangeContainer.Refresh()
+					refreshCorpusPreviewFunc()
 				}),
 			),
 			newMacroInput,
@@ -270,41 +273,206 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 
 var macroIcon *canvas.Image = canvas.NewImageFromResource(resourceMacroSvg)
 
-func AddMacro(con *fyne.Container, oldMakro *M1) {
-	macroIcon.SetMinSize(fyne.NewSquareSize(20))
-	con.Add(container.NewHBox(
-		// widget.NewCheck("", func(checked bool) {
-		// 	return
-		// }),
-		// widget.NewIcon(theme.MenuDropDownIcon()),
-		macroIcon,
-		widget.NewRichTextFromMarkdown(fmt.Sprintf("### %s", oldMakro.MakroName)),
-		// widget.NewIcon(theme.VisibilityIcon()),
-		// widget.NewIcon(theme.DocumentSaveIcon()),
-		widget.NewButtonWithIcon("Uaktualnij", theme.NavigateNextIcon(), func() {
-			macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, oldMakro.MakroName) + ".CMK"
-			for _, makroTochangeName := range MacrosToChange {
-				if makroTochangeName.Text == macroGuessedPath {
-					return
-				}
+type MacroCacheKey struct {
+	Path         string
+	ElementIndex int
+	ADIndex      int
+	MacroIndex   int
+}
+
+type MacroContainer struct {
+	widget.BaseWidget
+	all      *fyne.Container
+	header   *fyne.Container
+	content  *fyne.Container
+	isOpen   bool
+	oldMakro *M1
+	newMakro *M1
+}
+
+// NewMacroContainer creates a new instance of MacroContainer
+func NewMacroContainer(objects ...fyne.CanvasObject) *MacroContainer {
+	c := container.NewVBox(objects...)
+	mc := &MacroContainer{
+		all:     nil,
+		header:  nil,
+		content: c,
+		isOpen:  false,
+	}
+
+	previewButton := widget.NewButtonWithIcon("", theme.VisibilityIcon(), func() {})
+	previewButton.OnTapped = func() {
+		if mc.isOpen {
+			previewButton.Icon = theme.VisibilityIcon()
+			c.Hide()
+		} else {
+			previewButton.Icon = theme.VisibilityOffIcon()
+			c.Show()
+		}
+		previewButton.Refresh()
+		mc.isOpen = !mc.isOpen
+	}
+	loadThisMacroButton := widget.NewButtonWithIcon("Zaczytaj to makro", theme.NavigateNextIcon(), func() {
+		if mc.oldMakro == nil {
+			return
+		}
+		macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, mc.oldMakro.MakroName) + ".CMK"
+		addToLoadedFilesAndRefresh(SelectedPath)
+		for _, makroTochangeName := range MacrosToChange {
+			if makroTochangeName.Text == macroGuessedPath {
+				return
 			}
-			needCreation := true
-			for _, makroTochangeName := range MacrosToChange {
-				if makroTochangeName.Text == "" {
-					makroTochangeName.SetText(macroGuessedPath)
-					needCreation = false
-					break
-				}
+		}
+		needCreation := true
+		for _, makroTochangeName := range MacrosToChange {
+			if makroTochangeName.Text == "" {
+				makroTochangeName.SetText(macroGuessedPath)
+				needCreation = false
+				break
 			}
-			if needCreation {
-				addMakroButton.OnTapped()
-			}
-			MacrosToChange[len(MacrosToChange)-1].SetText(macroGuessedPath)
-			if refreshCorpusPreviewFunc != nil {
-				refreshCorpusPreviewFunc()
-			}
-		}),
-	))
+		}
+		if needCreation {
+			addMakroButton.OnTapped()
+		}
+		MacrosToChange[len(MacrosToChange)-1].SetText(macroGuessedPath)
+		c.Refresh()
+		refreshCorpusPreviewFunc() // todo
+	},
+	)
+	mc.header = container.NewBorder(nil, nil,
+		previewButton,
+		loadThisMacroButton,
+	)
+	mc.all = container.NewVBox(mc.header, mc.content)
+	mc.content.Hide()
+
+	mc.ExtendBaseWidget(mc)
+	return mc
+}
+
+// func smartTextComparison(oldDAT string, newDAT string) (string, string) {
+// 	var oldReformatted strings.Builder
+// 	var newReformatted strings.Builder
+
+// 	// load everything related to old
+// 	oldVariablesKeys, oldValues, oldVariablesComments := loadValuesFromSection(oldDAT)
+
+// 	// load everything related to new
+// 	newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newDAT)
+// 	return oldReformatted.String(), newReformatted.String()
+// }
+
+func (mc *MacroContainer) SetNewMacro(newMakro *M1) {
+	con := mc
+	con.newMakro = newMakro
+	con.header.Objects[0].(*widget.Button).SetText(newMakro.MakroName + " (do zamiany)")
+	con.header.Refresh()
+	{
+		varijableText := con.content.Objects[0]
+		UpdateMakro(con.oldMakro, con.newMakro, false)
+
+		text := "`[VARIJABLE]`\n\n```\n" + strings.Join(decodeAllCMKLines(con.newMakro.Varijable.DAT), "\n") + "\n```"
+		multilineNew := widget.NewRichTextFromMarkdown(text)
+		multilineNew.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+		split := container.NewHSplit(varijableText, multilineNew)
+		con.content.Objects[0] = split
+		split.Refresh()
+	}
+	// jointText := con.header.Objects[1].(*widget.RichText)
+}
+func (mc *MacroContainer) SetOldMacro(oldMakro *M1) {
+	con := mc
+	con.oldMakro = oldMakro
+	con.newMakro = nil
+	con.header.Objects[0].(*widget.Button).SetText(oldMakro.MakroName)
+	con.header.Refresh()
+	con.content.RemoveAll() // not ideal...
+	{
+		textOld := "`[VARIJABLE]`\n\n```\n" + strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n") + "\n```"
+		multilineOld := widget.NewRichTextFromMarkdown(textOld)
+		multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+		con.content.Add(multilineOld)
+	}
+	if oldMakro.Joint != nil {
+		textOld := "`[JOINT]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(oldMakro.Joint.DAT, "")), "\n") + "\n```"
+		multilineOld := widget.NewRichTextFromMarkdown(textOld)
+		multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+		con.content.Add(multilineOld)
+	}
+	var showAllMakro *widget.Button
+	showAllMakro = widget.NewButton("Pokaż całe makro", func() {
+		con.content.Remove(showAllMakro)
+		if oldMakro.Formule != nil {
+			textOld := "`[Formule]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(oldMakro.Formule.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		for i, item := range oldMakro.Pocket {
+			textOld := "`[POCKET" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		for i, item := range oldMakro.Potrosni {
+			textOld := "`[POTROSNI" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		for i, item := range oldMakro.Grupa {
+			textOld := "`[GRUPA" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		for i, item := range oldMakro.Raster {
+			textOld := "`[RASTER" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		for i, item := range oldMakro.Makro {
+			textOld := "`[MAKRO" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multilineOld := widget.NewRichTextFromMarkdown(textOld)
+			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			con.content.Add(multilineOld)
+		}
+		con.content.Add(widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {
+			con.content.Hide()
+			con.header.Objects[0].(*widget.Button).SetIcon(theme.VisibilityIcon())
+			con.header.Refresh()
+		}))
+	})
+	con.content.Add(showAllMakro)
+	mc.Refresh()
+}
+
+func (mc *MacroContainer) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(mc.all)
+}
+
+// wanted to use cache so that accordion does not blink when refreshing, but does not work...
+func getCachedMacroContainer(
+	Path string,
+	ElementIndex int,
+	ADIndex int,
+	MacroIndex int,
+) *MacroContainer {
+	key := MacroCacheKey{Path, ElementIndex, ADIndex, MacroIndex}
+	con, found := macroCache[key]
+	if found {
+		return con
+	}
+	_con := NewMacroContainer()
+	macroCache[key] = _con
+	return _con
+}
+
+var macroCache map[MacroCacheKey](*MacroContainer) = map[MacroCacheKey](*MacroContainer){}
+
+func RefreshMacro(con *MacroContainer, oldMakro *M1) {
+	con.SetOldMacro(oldMakro)
 
 	var newMakro *M1
 	for _, makroTochangeName := range MacrosToChange {
@@ -317,66 +485,14 @@ func AddMacro(con *fyne.Container, oldMakro *M1) {
 			}
 			break
 		}
-	} // C:\Tri D Corpus\Corpus 5.0\Makro\Zawieszki Standard Stolarz do HDF.CMK
-
-	if newMakro == nil {
-		{
-			textOld := strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n")
-			multilineOld := widget.NewRichTextWithText(textOld)
-			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			con.Add(widget.NewRichTextFromMarkdown("`[VARIJABLE]`"))
-			con.Add(multilineOld)
-		}
-		{
-			con.Add(widget.NewRichTextFromMarkdown("`[JOINT]`"))
-			var textOld string
-			if oldMakro.Joint != nil {
-				textOld = strings.Join(decodeAllCMKLines(cmp.Or(oldMakro.Joint.DAT, "")), "\n")
-			} else {
-				textOld = ""
-			}
-			multilineOld := widget.NewRichTextWithText(textOld)
-			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			con.Add(multilineOld)
-		}
-	} else {
-		{
-			textOld := strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n")
-			multilineOld := widget.NewRichTextWithText(textOld)
-			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			multilineNew := widget.NewMultiLineEntry()
-			textNew := strings.Join(decodeAllCMKLines(newMakro.Varijable.DAT), "\n")
-			multilineNew.SetText(textNew)
-			con.Add(widget.NewRichTextFromMarkdown("`[VARIJABLE]`"))
-			con.Add(container.NewHSplit(multilineOld, multilineNew))
-		}
-		{
-			var textOld string
-			if oldMakro.Joint != nil {
-				textOld = strings.Join(decodeAllCMKLines(oldMakro.Joint.DAT), "\n")
-			} else {
-				textOld = ""
-			}
-			multilineOld := widget.NewRichTextWithText(textOld)
-			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			multilineNew := widget.NewMultiLineEntry()
-			var textNew string
-			if newMakro.Joint != nil {
-				textNew = strings.Join(decodeAllCMKLines(newMakro.Joint.DAT), "\n")
-			} else {
-				textNew = ""
-			}
-			multilineNew.SetText(textNew)
-			con.Add(widget.NewRichTextFromMarkdown("`[JOINT]`"))
-			con.Add(container.NewHSplit(multilineOld, multilineNew))
-		}
 	}
-	con.Add(widget.NewRichTextFromMarkdown("`[FORMULE]`\n\nTodo: add button to show the rest"))
+	if newMakro != nil {
+		con.SetNewMacro(newMakro)
+	}
 }
 
-// // formatka/Daske
-func AddPlate(con *fyne.Container, element *Element, adIndex int) {
-	vBox := container.NewVBox()
+// formatka/Daske
+func RefreshPlate(con *fyne.Container, element *Element, elementIndex int, adIndex int) {
 	daskeName := element.Daske.AD[adIndex].DName.Value
 	numMakros := 0
 	for _, spoj := range element.Elinks.Spoj {
@@ -385,21 +501,25 @@ func AddPlate(con *fyne.Container, element *Element, adIndex int) {
 			numMakros++
 		}
 	}
-	item1 := widget.NewAccordionItem("▧ Formatka: '"+daskeName+"' (makra: "+strconv.Itoa(numMakros)+")", vBox)
-	accordion := widget.NewAccordion(item1)
-	con.Add(accordion)
-	for _, spoj := range element.Elinks.Spoj {
+	accordionContent := container.NewVBox()
+
+	for spojIndex, spoj := range element.Elinks.Spoj {
 		_adIndex, _ := strconv.Atoi(spoj.O1.Value)
 		if _adIndex != adIndex {
 			continue
 		}
-		AddMacro(vBox, &spoj.Makro1)
+		_con := getCachedMacroContainer(SelectedPath, elementIndex, spojIndex, adIndex)
+		RefreshMacro(_con, &spoj.Makro1)
+		accordionContent.Add(_con)
 	}
+	item1 := widget.NewAccordionItem("▧ Formatka: '"+daskeName+"' (makra: "+strconv.Itoa(numMakros)+")", accordionContent)
+	con.Add(widget.NewAccordion(item1))
 }
 
+var cabinetIcon = canvas.NewImageFromResource(resourceCabinetSvg)
+
 // todo make refresh instead add
-func AddElement(con *fyne.Container, element *Element) {
-	cabinetIcon := canvas.NewImageFromResource(resourceCabinetSvg)
+func RefreshElement(con *fyne.Container, element *Element, elementIndex int) {
 	cabinetIcon.SetMinSize(fyne.NewSquareSize(25))
 	con.Add(
 		container.NewHBox(
@@ -412,9 +532,19 @@ func AddElement(con *fyne.Container, element *Element) {
 		),
 	)
 	for adIndex, _ := range element.Daske.AD {
-		AddPlate(con, element, adIndex)
+		_con := container.NewVBox()
+		RefreshPlate(_con, element, elementIndex, adIndex)
+		con.Add(_con)
 	}
 	con.Add(widget.NewSeparator())
+}
+
+func RefreshElementFile(con *fyne.Container) {
+	for elementIndex, element := range loaddedFileForPreview.Element {
+		// _con := container.NewVBox()
+		RefreshElement(con, &element, elementIndex)
+		// con.Add(_con)
+	}
 }
 
 var refreshCorpusPreviewFunc func()
@@ -422,13 +552,13 @@ var refreshCorpusPreviewFunc func()
 func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
 	refreshCorpusPreviewFunc = func() {
 		vBox.RemoveAll()
-		stat, err := os.Stat(selectedPath)
+		stat, err := os.Stat(SelectedPath)
 		if err != nil {
-			l := widget.NewLabel(fmt.Sprintf("Nie można przeczytać '%s'\n: %s", selectedPath, err))
+			l := widget.NewLabel(fmt.Sprintf("Nie można przeczytać '%s'\n: %s", SelectedPath, err))
 			l.Wrapping = fyne.TextWrapWord
 			vBox.Add(l)
 		} else if stat.IsDir() {
-			l := widget.NewLabel(fmt.Sprintf("Wybrano katlog '%s'", selectedPath))
+			l := widget.NewLabel(fmt.Sprintf("Wybrano katlog '%s'", SelectedPath))
 			l.Wrapping = fyne.TextWrapWord
 			l2 := widget.NewLabel("Kliknij Dodaj aby wybrać wszystkie pliki w katalogu")
 			l3 := widget.NewLabel("Kliknij w plik aby otworzyć podgląd")
@@ -442,15 +572,36 @@ func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLab
 			o := toolbarLabel.ToolbarObject()
 			var container *fyne.Container = o.(*fyne.Container)
 			headerLabel := container.Objects[1].(*widget.Label)
-			headerLabel.SetText("Podgląd: " + selectedPath)
+			headerLabel.SetText("Podgląd: " + SelectedPath)
 			// headerLabel.Wrapping = fyne.TextWrapWord
 			// headerLabel.Truncation = fyne.TextTruncateClip
-			for _, element := range loaddedFileForPreview.Element {
-				AddElement(vBox, &element)
-			}
+			RefreshElementFile(vBox)
+			// vBox.Add(getCachedMacroContainer("", 0, 0, 0))
+			vBox.Refresh()
 		}
 	}
 	return refreshCorpusPreviewFunc
+}
+
+func addToLoadedFilesAndRefresh(path string) {
+	contains := slices.ContainsFunc(loadedFiles, func(e struct {
+		path   string
+		isFile bool
+	}) bool {
+		return e.path == path
+	})
+	if path != "" && !contains {
+		stat, err := os.Stat(path)
+		isFile := true
+		if err == nil && stat.IsDir() {
+			isFile = false
+		}
+		loadedFiles = append(loadedFiles, struct {
+			path   string
+			isFile bool
+		}{path, isFile})
+		refreshListOfLoadedFiles()
+	}
 }
 
 func getCenterPanel() *fyne.Container {
@@ -460,26 +611,10 @@ func getCenterPanel() *fyne.Container {
 	topBar := widget.NewToolbar(
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
-		NewToolbarButton("Wybierz", func() {
-			contains := slices.ContainsFunc(loadedFiles, func(e struct {
-				path   string
-				isFile bool
-			}) bool {
-				return e.path == selectedPath
-			})
-			if selectedPath != "" && !contains {
-				stat, err := os.Stat(selectedPath)
-				isFile := true
-				if err == nil && stat.IsDir() {
-					isFile = false
-				}
-				loadedFiles = append(loadedFiles, struct {
-					path   string
-					isFile bool
-				}{selectedPath, isFile})
-			}
-			refreshListOfLoadedFiles()
-		}),
+		NewToolbarButton("Zaczytaj ten plik/katalog", func() {
+			addToLoadedFilesAndRefresh(SelectedPath)
+		},
+		),
 	)
 	generateRefreshCorpusPreview(vBox, toolbarLabel)
 
@@ -503,7 +638,7 @@ func RunGui() {
 
 	topBar := widget.NewToolbar(
 		widget.NewToolbarSpacer(),
-		NewToolbarButton("Podumuj i zamień makra", func() {}),
+		NewToolbarButton("Podsumuj i zamień makra", func() {}),
 	)
 	left := getLeftPanel(&myWindow)
 	right := getRightPanel(&myWindow)
