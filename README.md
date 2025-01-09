@@ -161,3 +161,19 @@ Not set yet. If you make modifications you must share them with author.
 # Communication
 
 Use github issues: https://github.com/Mateusz-Grzelinski/corpus-macro-replacer/issues
+
+# Roadmap
+
+- [ ] handle corpus files (currently only E3D)
+- [ ] handle (recursive) group of object!!!
+- [ ] make cabinet (szafka) collapsible
+- [ ] allow to manually edit makro
+	- make it so that this edit can be applied to all files
+- [ ] read makro names from .dat files
+- [ ] save log to file
+- [ ] add settings like: minify, default makro path
+- [ ] add light/dark theme
+- [ ] read multiple corpus files at the time
+- [ ] indicate errors with color
+- [ ] add various filtering options to UI
+- [ ] better comparison view for makro

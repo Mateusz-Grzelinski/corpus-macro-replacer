@@ -37,6 +37,8 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 		m.Potrosni = append(m.Potrosni, GenericAttribute{DAT: currentSectionText})
 	case "pocket":
 		m.Pocket = append(m.Pocket, GenericAttribute{DAT: currentSectionText})
+	case "pila":
+		m.Pila = append(m.Pila, GenericAttribute{DAT: currentSectionText})
 	case "makro":
 		embeddedMakro := EmbeddedMakro{DAT: currentSectionText, MAK: nil}
 		for _, line := range strings.Split(currentSectionText, CMKLineSeparator) { // todo iterate
@@ -161,7 +163,7 @@ func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
 		if strings.HasPrefix(text, "[") {
 			matched := SectionRegex.FindStringSubmatch(text)
 			if matched == nil {
-				return nil, fmt.Errorf("%s was parsed badly, I was looking for section name.\n", text)
+				return nil, fmt.Errorf("%s was parsed badly, was looking for section name", text)
 			}
 			fullSectionName, sectionName := matched[1], matched[2]
 			allSections[fullSectionName]++

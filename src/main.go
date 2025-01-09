@@ -88,6 +88,17 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 	})
 }
 
+func findCorpusFiles(inputFolder string) []string {
+	foundCorpusFiles := []string{}
+	filepath.Walk(inputFolder, func(path string, info fs.FileInfo, err error) error {
+		if info != nil && !info.IsDir() && isCorpusExtension(info.Name()) {
+			foundCorpusFiles = append(foundCorpusFiles, path)
+		}
+		return nil
+	})
+	return foundCorpusFiles
+}
+
 func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makroFiles []string) {
 	inputFolderStat, err := os.Stat(inputFolder)
 	if err != nil {
@@ -101,13 +112,8 @@ func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makr
 		log.Fatal(err)
 	}
 
-	foundCorpusFiles := []string{}
-	filepath.Walk(inputFolder, func(path string, info fs.FileInfo, err error) error {
-		if !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".e3d") {
-			foundCorpusFiles = append(foundCorpusFiles, path)
-		}
-		return nil
-	})
+	foundCorpusFiles := findCorpusFiles(inputFolder)
+
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
 	for _, inputFile := range foundCorpusFiles {
