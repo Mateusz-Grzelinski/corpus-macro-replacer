@@ -139,7 +139,7 @@ func (i *arrayFlags) Set(value string) error {
 func main() {
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
-		fmt.Fprintln(w, `This program is used to update makro in Copus (.E3D) files. 
+		fmt.Fprint(w, `This program is used to update makro in Copus (.E3D) files. 
 It is alternative to doule ticks in macro editor that actually works: 
 - it does not edit [JOINT] section
 - does a smart merge on [VARIJABLE] section, see README: https://github.com/Mateusz-Grzelinski/corpus-macro-replacer

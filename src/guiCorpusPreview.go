@@ -417,7 +417,7 @@ func (efc *ElementFileContainer) SetElement(element *Element, elementIndex int) 
 	hbox := elemCon.Objects[0].(*fyne.Container)
 	hbox.Objects[1] = widget.NewRichTextFromMarkdown(
 		fmt.Sprintf(
-			"## Szafka: %s (Formatek: %s, Makr: %s)", element.EName.Value, element.Daske.DCount.Value, element.Elinks.COUNT.Value,
+			"## Szafka: %s (Formatek: %s, Makr: %s)\n\nPodgrup: %d", element.EName.Value, element.Daske.DCount.Value, element.Elinks.COUNT.Value, len(element.ElmList.Elm),
 		),
 	)
 	for adIndex, _ := range element.Daske.AD {

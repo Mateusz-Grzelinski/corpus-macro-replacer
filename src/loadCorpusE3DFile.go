@@ -23,17 +23,29 @@ type ElementFile struct {
 	VER     xml.Attr  `xml:"VER,attr"`
 	Element []Element `xml:"ELEMENT"`
 }
+
+// single cabinet
 type Element struct {
 	GenericNode
-	EName  xml.Attr `xml:"ENAME,attr"`
-	Daske  Daske    `xml:"DASKE"`
-	Elinks Elinks   `xml:"ELINKS"`
+	EName   xml.Attr `xml:"ENAME,attr"`
+	Daske   Daske    `xml:"DASKE"`
+	ElmList ElmList  `xml:"ELMLIST"`
+	Elinks  Elinks   `xml:"ELINKS"`
+}
+
+// list of nested elements
+type ElmList struct {
+	GenericNode
+	ECount xml.Attr  `xml:"ECOUNT,attr"`
+	Elm    []Element `xml:"ELM"`
 }
 type Daske struct {
 	GenericNode
 	DCount xml.Attr `xml:"DCOUNT,attr"`
 	AD     []AD     `xml:"AD"`
 }
+
+// plank
 type AD struct {
 	GenericNode
 	DName xml.Attr `xml:"DNAME,attr"`
@@ -112,7 +124,8 @@ func (tr TrimmerDecoder) Token() (xml.Token, error) {
 	return t, err
 }
 
-func ReadCorpusFile(inputFile string) (*ElementFile, error) {
+// normal idiomatic way of reading corpus file
+func NewCorpusFile(inputFile string) (*ElementFile, error) {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {
@@ -146,9 +159,10 @@ func ReadCorpusFile(inputFile string) (*ElementFile, error) {
 		default:
 		}
 	}
-	return nil, fmt.Errorf("something went wrong when reading corpus file")
+	return nil, fmt.Errorf("something went wrong when reading corpus file. Wrong file format?")
 }
 
+// goes via file token by token thus has better chance of being correct
 func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool, handleRootElement func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)

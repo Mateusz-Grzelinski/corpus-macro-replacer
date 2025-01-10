@@ -108,7 +108,7 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	stat, err := os.Stat(SelectedPath)
 	if err == nil {
 		if !stat.IsDir() && isCorpusExtension(SelectedPath) {
-			elementFile, err := ReadCorpusFile(SelectedPath)
+			elementFile, err := NewCorpusFile(SelectedPath)
 			loaddedFileForPreview = elementFile
 			if err != nil {
 				log.Println(err)
