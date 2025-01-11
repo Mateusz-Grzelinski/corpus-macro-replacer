@@ -76,7 +76,7 @@ func onTappedOutputPopup(self widget.ToolbarItem, w fyne.Window) func() {
 								path := lu.Path()
 								outputPath.SetText(path)
 							}, w)
-							fileOpenDialog.Resize(DialogSize)
+							fileOpenDialog.Resize(DialogSizeDefault)
 							fileOpenDialog.Show()
 						}),
 						widget.NewButtonWithIcon("Wykonaj", theme.MediaPlayIcon(), func() {

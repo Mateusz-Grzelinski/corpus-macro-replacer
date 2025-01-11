@@ -17,13 +17,6 @@ import (
 
 var macroIcon *canvas.Image = canvas.NewImageFromResource(resourceMacroSvg)
 
-type MacroCacheKey struct {
-	Path         string
-	ElementIndex int
-	ADIndex      int
-	MacroIndex   int
-}
-
 type MacroContainer struct {
 	widget.BaseWidget
 	all           *fyne.Container
@@ -33,10 +26,12 @@ type MacroContainer struct {
 	isOpen        bool
 	oldMakro      *M1
 	newMakro      *M1
+
+	// for reference when updating
+	openButton *widget.Button
 }
 
-// NewMacroContainer creates a new instance of MacroContainer
-func NewMacroContainer() *MacroContainer {
+func NewMacroContainer(nestLevel int) *MacroContainer {
 	mc := &MacroContainer{
 		all:           nil,
 		contentHeader: nil,
@@ -44,7 +39,7 @@ func NewMacroContainer() *MacroContainer {
 		contentDiff:   nil,
 		isOpen:        false,
 	}
-	var previewButton, loadThisMacroButton *widget.Button
+	var openButton, loadThisMacroButton *widget.Button
 	contentDiff := container.NewVBox(
 		container.NewVBox(),          // 0 Varijable
 		container.NewVBox(),          // 1 joint
@@ -70,14 +65,14 @@ func NewMacroContainer() *MacroContainer {
 		container.NewWithoutLayout(),
 	)
 
-	previewButton = widget.NewButtonWithIcon("", theme.VisibilityIcon(), func() {})
-	previewButton.OnTapped = func() {
+	openButton = widget.NewButtonWithIcon("", theme.VisibilityIcon(), func() {})
+	openButton.OnTapped = func() {
 		if mc.isOpen {
-			previewButton.Icon = theme.VisibilityIcon()
+			openButton.Icon = theme.VisibilityIcon()
 			mc.contentRead.Hide()
 			mc.contentDiff.Hide()
 		} else {
-			previewButton.Icon = theme.VisibilityOffIcon()
+			openButton.Icon = theme.VisibilityOffIcon()
 			if mc.newMakro == nil {
 				mc.contentRead.Show()
 				mc.contentDiff.Hide()
@@ -86,9 +81,10 @@ func NewMacroContainer() *MacroContainer {
 				mc.contentDiff.Show()
 			}
 		}
-		previewButton.Refresh()
+		openButton.Refresh()
 		mc.isOpen = !mc.isOpen
 	}
+	mc.openButton = openButton
 	loadThisMacroButton = widget.NewButtonWithIcon("Zamień to makro", theme.NavigateNextIcon(), func() {
 		if mc.oldMakro == nil {
 			return
@@ -116,8 +112,12 @@ func NewMacroContainer() *MacroContainer {
 		refreshCorpusPreviewFunc()
 	},
 	)
+	leftPadding := canvas.NewRectangle(nil)                        // Empty rectangle
+	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
+	h := container.NewHBox(leftPadding, openButton)
+
 	mc.contentHeader = container.NewBorder(nil, nil,
-		previewButton,
+		h,
 		loadThisMacroButton,
 	)
 	mc.contentRead = contentRead
@@ -156,29 +156,28 @@ func smartTextComparison(changes []Change) (string, string) {
 	return oldReformatted.String(), newReformatted.String()
 }
 
-func (mc *MacroContainer) SetMacroForDiff(newMakro *M1) {
-	con := mc
-	con.newMakro = newMakro
-	oldMakro := con.oldMakro
+func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1) {
+	mc.newMakro = newMakro
+	oldMakro := mc.oldMakro
 	if newMakro == nil {
-		mc.SetMacro(mc.oldMakro)
+		mc.Update(mc.oldMakro)
 		if mc.isOpen {
-			con.contentDiff.Hide()
-			con.contentRead.Show()
+			mc.contentDiff.Hide()
+			mc.contentRead.Show()
 		}
 		return
 	}
 	if mc.isOpen {
-		con.contentDiff.Show()
+		mc.contentDiff.Show()
 	}
-	con.contentRead.Hide()
+	mc.contentRead.Hide()
 
-	con.contentHeader.Objects[0].(*widget.Button).SetText(newMakro.MakroName + " (porównanie z plikiem .CMK)")
-	con.contentHeader.Refresh()
+	mc.openButton.SetText(cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+	mc.contentHeader.Refresh()
 
 	// todo only varijable changes are returned
 	{
-		varijableChanges := UpdateMakro(con.oldMakro, con.newMakro, false)
+		varijableChanges := UpdateMakro(mc.oldMakro, mc.newMakro, false)
 		old, new := smartTextComparison(varijableChanges)
 		newText := "`[VARIJABLE] // po zaktualizowaniu z pliku .CMK`\n\n```\n" + new + "\n```"
 		newVarijableRichText := widget.NewRichTextFromMarkdown(newText)
@@ -188,7 +187,7 @@ func (mc *MacroContainer) SetMacroForDiff(newMakro *M1) {
 		oldVarijableRichText.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
 		split := container.NewHSplit(oldVarijableRichText, newVarijableRichText)
 		split.Offset = 0.4
-		con.contentDiff.Objects[0] = split
+		mc.contentDiff.Objects[0] = split
 	}
 	{
 		new, old := "", ""
@@ -207,7 +206,7 @@ func (mc *MacroContainer) SetMacroForDiff(newMakro *M1) {
 			oldVarijableRichText.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
 			split := container.NewHSplit(oldVarijableRichText, newVarijableRichText)
 			split.Offset = 0.4
-			con.contentDiff.Objects[1] = split
+			mc.contentDiff.Objects[1] = split
 		}
 	}
 	var showAllMakro *widget.Button
@@ -217,23 +216,23 @@ func (mc *MacroContainer) SetMacroForDiff(newMakro *M1) {
 			textOld := "`[FORMULE] // formule jest zawsze wczytywane z pliku .CMK`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(newMakro.Formule.DAT, "")), "\n") + "\n```"
 			multilineOld := widget.NewRichTextFromMarkdown(textOld)
 			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			con.contentRead.Objects[2] = multilineOld
+			mc.contentRead.Objects[2] = multilineOld
 		}
-		con.contentRead.Objects[8] = widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {
-			con.contentDiff.Hide()
-			con.contentHeader.Objects[0].(*widget.Button).SetIcon(theme.VisibilityIcon())
-			con.contentHeader.Refresh()
+		mc.contentRead.Objects[8] = widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {
+			mc.contentDiff.Hide()
+			mc.contentHeader.Objects[0].(*widget.Button).SetIcon(theme.VisibilityIcon())
+			mc.contentHeader.Refresh()
 			mc.isOpen = false
 		})
 	})
-	con.contentRead.Objects[9] = showAllMakro
+	mc.contentRead.Objects[9] = showAllMakro
 }
 
-func (mc *MacroContainer) SetMacro(oldMakro *M1) {
+func (mc *MacroContainer) Update(oldMakro *M1) {
 	con := mc
 	con.oldMakro = oldMakro
 	con.newMakro = nil
-	con.contentHeader.Objects[0].(*widget.Button).SetText(oldMakro.MakroName)
+	mc.openButton.SetText(cmp.Or(oldMakro.MakroName, "<Brak nazwy>"))
 	con.contentHeader.Refresh()
 	{
 		textOld := "`[VARIJABLE]`\n\n```\n" + strings.Join(decodeAllCMKLines(oldMakro.Varijable.DAT), "\n") + "\n```"
@@ -303,7 +302,7 @@ func (mc *MacroContainer) SetMacro(oldMakro *M1) {
 			grupaVBox.RemoveAll()
 			rasterVBox.RemoveAll()
 			makroVBox.RemoveAll()
-			con.contentHeader.Objects[0].(*widget.Button).SetIcon(theme.VisibilityIcon())
+			mc.openButton.SetIcon(theme.VisibilityIcon())
 			con.contentHeader.Refresh()
 			mc.isOpen = false
 		})
@@ -318,7 +317,7 @@ func (mc *MacroContainer) CreateRenderer() fyne.WidgetRenderer {
 func (cm *MacroContainer) Refresh() {
 	con := cm
 	oldMakro := cm.oldMakro
-	con.SetMacro(oldMakro)
+	con.Update(oldMakro)
 
 	// todo very slow
 	var newMakro *M1
@@ -333,7 +332,7 @@ func (cm *MacroContainer) Refresh() {
 			break
 		}
 	}
-	con.SetMacroForDiff(newMakro)
+	con.UpdateMacroForDiff(newMakro)
 	con.contentHeader.Refresh()
 	con.contentRead.Refresh()
 	con.contentDiff.Refresh()

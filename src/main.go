@@ -14,7 +14,7 @@ import (
 
 //go:generate fyne bundle -o src/bundled.go assets
 
-var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true}
+var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true, hideElementsWithZeroMacros: true}
 
 func readMakros(makroFiles []string) map[string]*M1 {
 	makrosToReplace := map[string]*M1{}

@@ -1,72 +1,80 @@
 package main
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
-func (efc *ElementFileContainer) SetElement(element *Element, elementIndex int) {
-	elemCon := efc.root.Objects[elementIndex].(*fyne.Container)
-	// cabinetTitle := elemCon.Objects[1].(*widget.RichText)
-	hbox := elemCon.Objects[0].(*fyne.Container)
-	hbox.Objects[1] = widget.NewRichTextFromMarkdown(
-		fmt.Sprintf(
-			"## Szafka: %s (Formatek: %s, Makr: %s)\n\nPodgrup: %d", element.EName.Value, element.Daske.DCount.Value, element.Elinks.COUNT.Value, len(element.ElmList.Elm),
-		),
-	)
-	for adIndex, _ := range element.Daske.AD {
-		efc.SetPlate(element, elementIndex, adIndex)
-	}
-}
-
-type ElementFileContainerKey struct {
-	elementIndex int  // cabinet
-	elmListIndex int  // recursion level
-	adIndex      *int // plate. In nil: get container for plate
-	macroIndex   *int // recursion level
-}
-
 type ElementFileContainer struct {
 	widget.BaseWidget
-	// 1 element = 1 container
-	root        *fyne.Container
+	content *fyne.Container
+	// actual corpus file, maybe not needed?
 	elementFile *ElementFile
-	// containerCabinets
-	// containerTree map[ElementFileContainerKey]*fyne.Container
+	// filters
+	// hideElementsWithZeroMacros bool
+
+	/*
+		{
+			szafka1
+			szafka2
+				podGrupa2
+			szafka3
+				podGrupa3
+					podPodGrupa3
+		}
+	*/
+
+	// only reference to containers
+	elementContainer []*ElementContainer
 }
 
 func NewElementFileContainer(ef *ElementFile, objects ...fyne.CanvasObject) *ElementFileContainer {
 	c := container.NewVBox(objects...)
-	mc := &ElementFileContainer{root: c, elementFile: ef}
-
-	for elementIndex, element := range ef.Element {
-		c := NewElement(&element, elementIndex)
-		mc.root.Add(c)
-		mc.SetElement(&element, elementIndex)
-		c.Refresh() // todo refresh here?
+	efc := &ElementFileContainer{
+		content:          c,
+		elementFile:      ef,
+		elementContainer: []*ElementContainer{},
 	}
 
-	mc.ExtendBaseWidget(mc)
-	return mc
+	for _, element := range ef.Element {
+		c := NewElement(&element, 0)
+		efc.content.Add(c)
+		efc.elementContainer = append(efc.elementContainer, c)
+	}
+
+	efc.ExtendBaseWidget(efc)
+	return efc
 }
 
-func (efc *ElementFileContainer) Refresh() {
-	// todo if number of elements, planks or macros changes, Refresh will not handle that!
-	for elementIndex, element := range efc.elementFile.Element {
-		efc.SetElement(&element, elementIndex)
-	}
-	efc.root.Refresh()
-}
+// todo is it needed?
+// func (efc *ElementFileContainer) Refresh() {
+// 	// todo if number of elements, planks or macros changes, Refresh will not handle that!
+// 	for elementIndex, element := range efc.elementFile.Element {
+// 		efc.Update(&element, elementIndex)
+// 	}
+// 	efc.root.Refresh()
+// }
 
 func (mc *ElementFileContainer) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(mc.root)
+	return widget.NewSimpleRenderer(mc.content)
+}
+func ElementTotalNumOfMacros(element *Element) int {
+	return _elementTotalNumOfMacros(element, 0)
+}
+func _elementTotalNumOfMacros(element *Element, accumulate int) int {
+	numOfMacros := len(element.Elinks.Spoj) + accumulate
+	for _, elem := range element.ElmList.Elm {
+		numOfMacros += _elementTotalNumOfMacros(&elem, numOfMacros)
+	}
+	return numOfMacros
 }
 
-// func RefreshElementFile(con *fyne.Container) {
-// 	for elementIndex, element := range loaddedFileForPreview.Element {
-// 		NewElement(con, &element, elementIndex)
-// 	}
-// }
+func (efc *ElementFileContainer) Update(elementFile *ElementFile) {
+	efc.elementFile = elementFile
+	for elementIndex, elementCon := range efc.elementContainer {
+		element := efc.elementFile.Element[elementIndex]
+		elementCon.Update(element, 0)
+	}
+	// efc.Refresh()
+}
