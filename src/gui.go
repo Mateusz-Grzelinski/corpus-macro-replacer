@@ -380,10 +380,11 @@ func getCenterPanel() *fyne.Container {
 	vBox := container.NewVBox()
 	// centerViewWithCorpusPreview = vBox // setting global reference, not ideal...
 	toolbarLabel := NewToolbarLabel("Wybierz plik aby podejrzeć")
+
 	topBar := widget.NewToolbar(
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
-		NewToolbarButton("Wczytaj plik/katalog", func() {
+		NewToolbarButtonWithIcon("Wczytaj plik/katalog", theme.ContentAddIcon(), func() {
 			addToLoadedFilesAndRefresh(SelectedPath)
 		},
 		),
@@ -409,7 +410,7 @@ func RunGui() {
 	logo.SetMinSize(fyne.NewSize(30, 30))
 
 	var outputButton widget.ToolbarItem
-	outputButton = NewToolbarButton("Podsumuj i zamień makra", onTappedOutputPopup(outputButton, myWindow))
+	outputButton = NewToolbarButtonWithIcon("Podsumuj i zamień makra", theme.MediaPlayIcon(), onTappedOutputPopup(outputButton, myWindow))
 	topBar := widget.NewToolbar(
 		widget.NewToolbarSpacer(),
 		outputButton,

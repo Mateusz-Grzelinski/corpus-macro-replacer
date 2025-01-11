@@ -11,8 +11,8 @@ type toolbarButton struct {
 	*widget.Button
 }
 
-func NewToolbarButton(label string, buttonFunc func()) widget.ToolbarItem {
-	b := widget.NewButtonWithIcon(label, theme.MediaPlayIcon(), buttonFunc)
+func NewToolbarButtonWithIcon(label string, icon fyne.Resource, buttonFunc func()) widget.ToolbarItem {
+	b := widget.NewButtonWithIcon(label, icon, buttonFunc)
 	return &toolbarButton{b}
 }
 
