@@ -44,5 +44,6 @@ type ProgramSettings struct {
 	alwaysConvertLocalToGlobal bool
 	verbose                    bool
 	hideElementsWithZeroMacros bool
+	compact                    bool
 	// convertLocalVariablesToGlobal ConvertLocalVariablesToGlobal
 }

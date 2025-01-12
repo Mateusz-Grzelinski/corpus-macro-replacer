@@ -16,12 +16,19 @@ type GenericNode struct {
 	// Comment  xml.Comment   `xml:",comment"`
 }
 
+// E3D file
 type ElementFile struct {
 	XMLName xml.Name `xml:"ELEMENTFILE"`
 	GenericNode
 	FILE    xml.Attr  `xml:"FILE,attr"`
 	VER     xml.Attr  `xml:"VER,attr"`
 	Element []Element `xml:"ELEMENT"`
+}
+
+// S3D file
+type ProjectFile struct {
+	XMLName xml.Name `xml:"PROJECTFILE"`
+	ElementFile
 }
 
 // single cabinet
@@ -125,11 +132,11 @@ func (tr TrimmerDecoder) Token() (xml.Token, error) {
 }
 
 // normal idiomatic way of reading corpus file
-func NewCorpusFile(inputFile string) (*ElementFile, error) {
+func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {
-		return nil, fmt.Errorf("error opening input file: %w", err)
+		return nil, nil, fmt.Errorf("error opening input file: %w", err)
 	}
 	defer input.Close()
 
@@ -141,25 +148,34 @@ func NewCorpusFile(inputFile string) (*ElementFile, error) {
 			if err.Error() == "EOF" {
 				break
 			}
-			return nil, fmt.Errorf("error decoding XML: %w", err)
+			return nil, nil, fmt.Errorf("error decoding XML: %w", err)
 		}
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "ELEMENTFILE" {
+			if t.Name.Local == "PROJECTFILE" {
+				var root *ProjectFile = new(ProjectFile)
+				decoder.Strict = true
+				err := decoder.DecodeElement(&root, &t)
+				decoder.Strict = false
+				if err != nil {
+					return nil, nil, err
+				}
+				return root, nil, nil
+			} else if t.Name.Local == "ELEMENTFILE" {
 				var root *ElementFile = new(ElementFile)
 				decoder.Strict = true
 				err := decoder.DecodeElement(&root, &t)
 				decoder.Strict = false
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
-				return root, nil
+				return nil, root, nil
 			}
 		default:
 		}
 	}
-	return nil, fmt.Errorf("something went wrong when reading corpus file. Wrong file format?")
+	return nil, nil, fmt.Errorf("something went wrong when reading corpus file. Wrong file format?")
 }
 
 // goes via file token by token thus has better chance of being correct
@@ -193,7 +209,7 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool, handl
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "ELEMENTFILE" {
+			if t.Name.Local == "PROJECTFILE" || t.Name.Local == "ELEMENTFILE" {
 				handleOut := handleRootElement(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {

@@ -33,14 +33,14 @@ func NewPlate(element *Element, adIndex int, nestLevel int) *PlateContainer {
 	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
 	h := container.NewHBox(leftPadding)
 	c := container.NewVBox()
-	macros := container.NewWithoutLayout()
+	macrosContainer := container.NewWithoutLayout()
 	c.Hide()
 
 	pc := &PlateContainer{
 		contentHeader:    h,
 		content:          c,
 		isOpen:           false,
-		macrosContainers: macros,
+		macrosContainers: macrosContainer,
 		all:              container.NewVBox(h, c),
 	}
 	daske := element.Daske
@@ -60,6 +60,9 @@ func NewPlate(element *Element, adIndex int, nestLevel int) *PlateContainer {
 			}
 			openButton.Refresh()
 		})
+
+	iconWidget := widget.NewIcon(resourceBox3Svg)
+	h.Add(iconWidget)
 	h.Add(openButton)
 	pc.openButton = openButton
 	h.Add(layout.NewSpacer())
@@ -71,9 +74,9 @@ func NewPlate(element *Element, adIndex int, nestLevel int) *PlateContainer {
 			continue
 		}
 		howMenyMacros++
-		_con := NewMacroContainer(nestLevel)
+		_con := NewMacroContainer(nestLevel, pc)
 		c.Add(_con)
-		macros.Add(_con)
+		macrosContainer.Add(_con)
 		_con.Update(&spoj.Makro1) // todo update here?
 	}
 	stats := widget.NewLabel(fmt.Sprintf("Makra: %d", howMenyMacros))
@@ -120,7 +123,17 @@ func (pc *PlateContainer) Update(element *Element, adIndex int) bool {
 	}
 	daske := element.Daske
 	ad := daske.AD[adIndex]
-	pc.openButton.SetText(fmt.Sprintf("Formatka: %s", ad.DName.Value))
+	if Settings.compact {
+		pc.contentHeader.Hide()
+		pc.isOpen = true
+		pc.content.Show()
+		pc.openButton.SetText(ad.DName.Value)
+	} else {
+		pc.openButton.SetText(fmt.Sprintf("Formatka: %s", ad.DName.Value))
+		pc.isOpen = false
+		pc.contentHeader.Show()
+		// pc.content.Hide()
+	}
 
 	howManyMacros := 0
 	for _, spoj := range element.Elinks.Spoj {

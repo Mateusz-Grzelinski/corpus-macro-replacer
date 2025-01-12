@@ -81,12 +81,13 @@ func NewElement(element *Element, nestLevel int) *ElementContainer {
 	ec.openButton = openButton
 	h.Add(layout.NewSpacer())
 	stats := widget.NewLabel("")
+	// stats.Truncation = fyne.TextTruncateEllipsis
 	ec.stats = stats
 	h.Add(stats)
 
 	// c.Add(widget.NewLabel("Todo"))
 	for adIndex, _ := range element.Daske.AD {
-		_c := NewPlate(element, adIndex, nestLevel)
+		_c := NewPlate(element, adIndex, nestLevel+1)
 		content.Add(_c)
 		p.Add(_c)
 	}

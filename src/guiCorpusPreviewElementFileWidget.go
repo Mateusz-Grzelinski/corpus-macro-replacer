@@ -65,7 +65,7 @@ func ElementTotalNumOfMacros(element *Element) int {
 func _elementTotalNumOfMacros(element *Element, accumulate int) int {
 	numOfMacros := len(element.Elinks.Spoj) + accumulate
 	for _, elem := range element.ElmList.Elm {
-		numOfMacros += _elementTotalNumOfMacros(&elem, numOfMacros)
+		numOfMacros = _elementTotalNumOfMacros(&elem, numOfMacros)
 	}
 	return numOfMacros
 }
@@ -73,7 +73,7 @@ func _elementTotalNumOfMacros(element *Element, accumulate int) int {
 func (efc *ElementFileContainer) Update(elementFile *ElementFile) {
 	efc.elementFile = elementFile
 	for elementIndex, elementCon := range efc.elementContainer {
-		element := efc.elementFile.Element[elementIndex]
+		element := elementFile.Element[elementIndex]
 		elementCon.Update(element, 0)
 	}
 	// efc.Refresh()

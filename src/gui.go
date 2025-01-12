@@ -36,8 +36,9 @@ var CorpusFileBrowserFreqentlyUsed = []string{
 const MacrosDefaultPathNormal = `C:\Tri D Corpus\Corpus 5.0\Makro\`
 const MacrosDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
 
-var loaddedFileForPreview *ElementFile
-var loaddedFileForPreviewError error
+var loadedS3DFileForPreview *ProjectFile
+var loadedE3DFileForPreview *ElementFile
+var loadedFileForPreviewError error
 var SelectedPath string
 
 // var centerViewWithCorpusPreview *fyne.Container
@@ -108,12 +109,18 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	stat, err := os.Stat(SelectedPath)
 	if err == nil {
 		if !stat.IsDir() && isCorpusExtension(SelectedPath) {
-			elementFile, err := NewCorpusFile(SelectedPath)
-			loaddedFileForPreview = elementFile
+			projectFile, elementFile, err := NewCorpusFile(SelectedPath)
+			if elementFile != nil {
+				loadedS3DFileForPreview = nil
+				loadedE3DFileForPreview = elementFile
+			} else if projectFile != nil {
+				loadedS3DFileForPreview = projectFile
+				loadedE3DFileForPreview = nil
+			}
 			if err != nil {
 				log.Println(err)
 			}
-			loaddedFileForPreviewError = err
+			loadedFileForPreviewError = err
 		}
 	}
 	if refreshCorpusPreviewFunc != nil {
@@ -177,7 +184,13 @@ func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
 		folderDialog.Resize(DialogSizeDefault)
 		folderDialog.Show()
 	})
-	CorpusFileTreeContainer = container.NewBorder(openFilesButton, nil, nil, nil, defaultContainer)
+
+	wczytajPlikKatalogButton := widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+		addToLoadedFilesAndRefresh(SelectedPath)
+	})
+	CorpusFileTreeContainer = container.NewBorder(
+		container.NewBorder(nil, nil, nil, wczytajPlikKatalogButton, openFilesButton),
+		nil, nil, nil, defaultContainer)
 
 	files := widget.NewAccordionItem("Pliki Corpusa", CorpusFileTreeContainer)
 	files.Open = true
@@ -316,39 +329,44 @@ func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLab
 			if !isCorpusExtension(SelectedPath) {
 				l := widget.NewLabel("To nie jest plik Corpusa: ")
 				l.Wrapping = fyne.TextWrapWord
-				lErr := widget.NewLabel(fmt.Sprintf("%s", SelectedPath))
+				lErr := widget.NewLabel(SelectedPath)
 				lErr.Wrapping = fyne.TextWrapWord
 				vBox.Add(l)
 				vBox.Add(lErr)
 				return
 			}
-			if loaddedFileForPreviewError != nil {
+			if loadedFileForPreviewError != nil {
 				l := widget.NewLabel("Błąd podczas czytania Corpusa:")
 				l.Wrapping = fyne.TextWrapWord
-				lErr := widget.NewLabel(fmt.Sprintf("%s", loaddedFileForPreviewError))
+				lErr := widget.NewLabel(fmt.Sprintf("%s", loadedFileForPreviewError))
 				lErr.Wrapping = fyne.TextWrapWord
 				vBox.Add(l)
 				vBox.Add(lErr)
 				return
 			}
-			if loaddedFileForPreview == nil {
+			if loadedE3DFileForPreview == nil && loadedS3DFileForPreview == nil {
 				return
 			}
+			var elementFileToDisplay *ElementFile
+			if loadedE3DFileForPreview != nil {
+				elementFileToDisplay = loadedE3DFileForPreview
+			}
+			if loadedS3DFileForPreview != nil {
+				elementFileToDisplay = &loadedS3DFileForPreview.ElementFile
+			}
+
 			o := toolbarLabel.ToolbarObject()
 			var container *fyne.Container = o.(*fyne.Container)
 			headerLabel := container.Objects[1].(*widget.Label)
 			headerLabel.SetText("Podgląd: " + SelectedPath)
-			if corpusPreviewContainer == nil || corpusPreviewContainer.elementFile != loaddedFileForPreview {
-				elemFileCon := NewElementFileContainer(loaddedFileForPreview)
+			if corpusPreviewContainer == nil || corpusPreviewContainer.elementFile != elementFileToDisplay {
+				elemFileCon := NewElementFileContainer(elementFileToDisplay)
 				corpusPreviewContainer = elemFileCon
 				vBox.Add(elemFileCon)
 			} else {
-				//if corpusPreview.elementFile == loaddedFileForPreview {
-				corpusPreviewContainer.elementFile = loaddedFileForPreview
-				corpusPreviewContainer.Refresh()
+				// corpusPreviewContainer.elementFile = elementFileToDisplay
+				corpusPreviewContainer.Update(elementFileToDisplay)
 				vBox.Add(corpusPreviewContainer)
-				// } else {
-				// 	log.Println("something webt wrong when refreshing corpus preview")
 			}
 		}
 	}
@@ -385,26 +403,21 @@ func getCenterPanel(w fyne.Window) *fyne.Container {
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(resourceFilterSvg, func() {
-			// popUpContent := container.NewVBox(
-			// 	widget.NewButton("Close", func() {
-			// 	}),
-			// )
-			// popup := widget.NewModalPopUp(popUpContent, w.Canvas())
-			// popup.Show()
-			// var filterDialog
-			check := widget.NewCheck("Pokazuj tylko elementy z przynajmniej jednym makrem", func(b bool) {
+			check1 := widget.NewCheck("Pokazuj tylko elementy z przynajmniej jednym makrem", func(b bool) {
 				Settings.hideElementsWithZeroMacros = b
 			})
-			check.Checked = Settings.hideElementsWithZeroMacros
+			check1.Checked = Settings.hideElementsWithZeroMacros
+			check2 := widget.NewCheck("Kompaktowy widok", func(b bool) {
+				Settings.compact = b
+			})
+			check2.Checked = Settings.compact
 			filterDialog := dialog.NewCustom("Filtruj", "Ok", container.NewVBox(
-				check,
+				check1,
+				check2,
 			), w)
 			filterDialog.Show()
 			filterDialog.SetOnClosed(func() {
-				if corpusPreviewContainer == nil {
-					return
-				}
-				corpusPreviewContainer.Update(loaddedFileForPreview)
+				refreshCorpusPreviewFunc()
 			})
 		}),
 		NewToolbarButtonWithIcon("Wczytaj plik/katalog", theme.ContentAddIcon(), func() {

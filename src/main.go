@@ -44,6 +44,7 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 	macrosUpdated := 0
 	macrosSkipped := 0
 	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
+		// todo support ProjectFile
 		var root ElementFile
 		decoder.Strict = true
 		err := decoder.DecodeElement(&root, &start)
