@@ -16,7 +16,7 @@ import (
 
 var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true, hideElementsWithZeroMacros: true}
 
-func readMakros(makroFiles []string) map[string]*M1 {
+func ReadMakrosFromCMK(makroFiles []string) map[string]*M1 {
 	makrosToReplace := map[string]*M1{}
 	for _, makroFile := range makroFiles {
 		absPathMakroFile := strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
@@ -33,9 +33,9 @@ func readMakros(makroFiles []string) map[string]*M1 {
 	return makrosToReplace
 }
 
-func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles []string) {
-	makrosToReplace := readMakros(makroFiles)
+// func updateElements()
 
+func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1) {
 	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
 		log.Fatalf("Can not create path: %s", outputFile)
@@ -43,14 +43,15 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 
 	macrosUpdated := 0
 	macrosSkipped := 0
-	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
-		// todo support ProjectFile
+
+	// todo how to handle 2 very similar types??? ElementFile vs ProjectFile
+	visitCorpusE3DFile := func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
 		var root ElementFile
 		decoder.Strict = true
 		err := decoder.DecodeElement(&root, &start)
 		decoder.Strict = false
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("%s: %s", inputFile, err)
 		}
 		for _, element := range root.Element {
 			visitedDaske := []string{}
@@ -86,10 +87,52 @@ func replaceMakroInCorpusE3DFile(inputFile string, outputFile string, makroFiles
 		log.Printf("  Summary: updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
 
 		return root
-	})
+	}
+
+	visitCorpusS3DFile := func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
+		var root ProjectFile
+		decoder.Strict = true
+		err := decoder.DecodeElement(&root, &start)
+		decoder.Strict = false
+		if err != nil {
+			log.Printf("%s: %s", inputFile, err)
+		}
+		for _, element := range root.Element {
+			visitedDaske := []string{}
+			updatedDaske := map[string]int{}
+			skippedDaske := map[string]int{}
+			for _, spoj := range element.Elinks.Spoj {
+				adIndex, _ := strconv.Atoi(spoj.O1.Value)
+				daske := element.Daske.AD[adIndex]
+				daskeName := daske.DName.Value
+				visitedDaske = append(visitedDaske, daskeName)
+				oldMakro := spoj.Makro1
+				newMakro, newMakroExists := makrosToReplace[oldMakro.MakroName]
+				if !newMakroExists {
+					macrosSkipped++
+					skippedDaske[daskeName]++
+					continue
+				}
+				UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+				macrosUpdated++
+				updatedDaske[daskeName]++
+			}
+			if Settings.verbose {
+				log.Printf("  Cabinet '%s'\n", element.EName.Value)
+				for _, name := range visitedDaske {
+					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
+				}
+			}
+		}
+		log.Printf("  Summary: updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
+
+		return root
+	}
+
+	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, visitCorpusE3DFile, visitCorpusS3DFile)
 }
 
-func findCorpusFiles(inputFolder string) []string {
+func FindCorpusFiles(inputFolder string) []string {
 	foundCorpusFiles := []string{}
 	filepath.Walk(inputFolder, func(path string, info fs.FileInfo, err error) error {
 		if info != nil && !info.IsDir() && isCorpusExtension(info.Name()) {
@@ -100,7 +143,7 @@ func findCorpusFiles(inputFolder string) []string {
 	return foundCorpusFiles
 }
 
-func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makroFiles []string) {
+func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string) {
 	inputFolderStat, err := os.Stat(inputFolder)
 	if err != nil {
 		log.Fatal(err)
@@ -113,14 +156,15 @@ func replaceMakroInCorpusE3DFolder(inputFolder string, outputFolder string, makr
 		log.Fatal(err)
 	}
 
-	foundCorpusFiles := findCorpusFiles(inputFolder)
+	foundCorpusFiles := FindCorpusFiles(inputFolder)
 
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
+	makrosToReplace := ReadMakrosFromCMK(makroFiles)
 	for _, inputFile := range foundCorpusFiles {
 		relInputFile, _ := filepath.Rel(inputFolder, inputFile)
 		outputFile := filepath.Join(outputFolder, relInputFile)
-		replaceMakroInCorpusE3DFile(inputFile, outputFile, makroFiles)
+		ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
 	}
 }
 
@@ -192,7 +236,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		log.Fatalf("output %s already exists. Add --force to override", *output)
 	}
 	if statInput.IsDir() {
-		replaceMakroInCorpusE3DFolder(*input, *output, makroFiles)
+		ReplaceMakroInCorpusFolder(*input, *output, makroFiles)
 	} else {
 		if errOutput == nil && statOutput.IsDir() || !strings.HasSuffix(strings.ToLower(*output), ".e3d") {
 			var newOutput string = filepath.Join(*output, filepath.Base(*input))
@@ -202,7 +246,9 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		if errNewOutput == nil && !*force {
 			log.Fatalf("output %s already exists. Add --force to override", *output)
 		}
-		replaceMakroInCorpusE3DFile(*input, *output, makroFiles)
+
+		makrosToReplace := ReadMakrosFromCMK(makroFiles)
+		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace)
 	}
 
 	// makroFile := `C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`

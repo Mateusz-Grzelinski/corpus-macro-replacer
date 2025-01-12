@@ -179,7 +179,10 @@ func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 }
 
 // goes via file token by token thus has better chance of being correct
-func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool, handleRootElement func(decoder *xml.Decoder, start xml.StartElement) xml.Token) error {
+func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
+	handleE3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
+	handleS3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
+) error {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {
@@ -209,8 +212,15 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool, handl
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "PROJECTFILE" || t.Name.Local == "ELEMENTFILE" {
-				handleOut := handleRootElement(decoder, t)
+			if t.Name.Local == "PROJECTFILE" {
+				handleOut := handleS3DFile(decoder, t)
+				if handleOut != nil {
+					if err = encoder.Encode(handleOut); err != nil {
+						log.Fatal(err)
+					}
+				}
+			} else if t.Name.Local == "ELEMENTFILE" {
+				handleOut := handleE3DFile(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {
 						log.Fatal(err)
