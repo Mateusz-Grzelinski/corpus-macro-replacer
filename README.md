@@ -11,7 +11,15 @@ Input:
 Output:
 - updates all `.E3D` files that references `Nawierty_uniwersalne_28mm` and saves it in output dir
 
-# Usage
+There are still bugs in code, expect some crashes.
+
+# Graphical interface
+
+This program is available with UI or via command line. Just run with no arguments to start UI.
+
+![image](https://github.com/user-attachments/assets/c6382ecf-fa37-4229-acdd-0c62d041304e)
+
+# Command line usage
 
 Run from command line.
 
