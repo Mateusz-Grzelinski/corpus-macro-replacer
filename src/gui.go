@@ -129,13 +129,6 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	}
 }
 
-func truncateText(s string, max int) string {
-	if max > len(s) {
-		return s
-	}
-	return s[:strings.LastIndex(s[:max], "\\")]
-}
-
 func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	var CorpusFileTreeContainer *fyne.Container
 	var fileTree *xWidget.FileTree
