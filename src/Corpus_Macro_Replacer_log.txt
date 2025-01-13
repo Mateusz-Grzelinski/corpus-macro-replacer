@@ -1,2 +1,0 @@
-Wciśnij Wykonaj aby uruchomić. Pliki zostaną nadpisane
-Zapisano log: C:\Users\grzel\go-projects\demo\src\Corpus_Macro_Replacer_log.txt
