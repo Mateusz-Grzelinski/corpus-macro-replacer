@@ -25,7 +25,7 @@ import (
 const CorpusMacroReplacerDefaultPath = `C:\Tri D Corpus\CorpusMacroReplacer\`
 const CorpusFileBrowserDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
 
-var CorpusFileBrowserFreqentlyUsed = []string{
+var CorpusTypicallyUsedFolders = []string{
 	`C:\Tri D Corpus\Corpus 4.0\elmsav\`,
 	`C:\Tri D Corpus\Corpus 4.0\sobasav\`,
 	`C:\Tri D Corpus\Corpus 5.0\elmsav\`,
@@ -42,9 +42,13 @@ var loadedE3DFileForPreview *ElementFile
 var loadedFileForPreviewError error
 var SelectedPath string
 
-// var centerViewWithCorpusPreview *fyne.Container
+var refreshCorpusPreviewFunc func()
+var corpusPreviewContainer *ElementFileContainer
 
-// var macrosToBeChanged []string = []string{}
+var ListOfLoadedFilesContainer *fyne.Container
+
+var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
+
 var loadedFiles []struct {
 	path   string
 	isFile bool
@@ -52,10 +56,6 @@ var loadedFiles []struct {
 	path   string
 	isFile bool
 }{}
-var ListOfLoadedFilesContainer *fyne.Container
-var outputPath string
-
-var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
 func RemoveIndex[T any](s []T, index int) []T {
 	return append(s[:index], s[index+1:]...)
@@ -129,19 +129,27 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	}
 }
 
-func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
-	nothingOpen := widget.NewLabel("Brak otwartych plików!")
-	nothingOpen.Truncation = fyne.TextTruncateClip
-	nothingOpen.Alignment = fyne.TextAlignCenter
+func truncateText(s string, max int) string {
+	if max > len(s) {
+		return s
+	}
+	return s[:strings.LastIndex(s[:max], "\\")]
+}
 
-	typical := widget.NewLabel("Typowe ścieżki:")
-	typical.Truncation = fyne.TextTruncateClip
-
+func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	var CorpusFileTreeContainer *fyne.Container
 	var fileTree *xWidget.FileTree
 
-	defaultContainer := container.NewVBox(nothingOpen, typical)
-	for _, p := range CorpusFileBrowserFreqentlyUsed {
+	nothingOpenLabel := widget.NewLabel("Brak otwartych plików!")
+	nothingOpenLabel.Truncation = fyne.TextTruncateClip
+	nothingOpenLabel.Alignment = fyne.TextAlignCenter
+
+	typicalLabel := widget.NewLabel("Typowe ścieżki")
+	typicalLabel.Truncation = fyne.TextTruncateClip
+	typicalLabel.Alignment = fyne.TextAlignCenter
+
+	defaultContainer := container.NewVBox(nothingOpenLabel, typicalLabel)
+	for _, p := range CorpusTypicallyUsedFolders {
 		_, err := os.Stat(p)
 		if err == nil {
 			defaultContainer.Add(widget.NewButtonWithIcon(p, theme.FolderOpenIcon(), func() {
@@ -151,11 +159,38 @@ func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
 				fileTree.OnSelected = CorpusFileTreeOnSelected
 				// todo filter extension but allow directory
 				// fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+				defaultContainer.RemoveAll()
 				CorpusFileTreeContainer.Remove(defaultContainer)
 				CorpusFileTreeContainer.Add(fileTree)
 				CorpusFileTreeContainer.Refresh()
 			}))
 		}
+	}
+	recentlyUsedLabel := widget.NewLabel("Ostatnio otwarte")
+	recentlyUsedLabel.Truncation = fyne.TextTruncateClip
+	recentlyUsedLabel.Alignment = fyne.TextAlignCenter
+
+	defaultContainer.Add(recentlyUsedLabel)
+	recentlyUsedFolders := a.Preferences().StringList("recentlyUsedFodlers")
+	slices.Reverse(recentlyUsedFolders)
+	for _, p := range recentlyUsedFolders {
+		l := widget.NewLabel(p)
+		l.Wrapping = fyne.TextWrapBreak
+		defaultContainer.Add(container.NewBorder(nil, nil,
+			// todo duplicated
+			widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
+				// pretty fat finger solution, duplicated below...
+				CorpusFileTreeContainer.Remove(fileTree)
+				fileTree = xWidget.NewFileTree(storage.NewFileURI(p))
+				fileTree.OnSelected = CorpusFileTreeOnSelected
+				// todo filter extension but allow directory
+				// fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+				defaultContainer.RemoveAll()
+				CorpusFileTreeContainer.Remove(defaultContainer)
+				CorpusFileTreeContainer.Add(fileTree)
+				CorpusFileTreeContainer.Refresh()
+			}), nil, l),
+		)
 	}
 	var openFilesButton *widget.Button = widget.NewButtonWithIcon("Otwórz katalog", theme.FolderOpenIcon(), func() {
 		folderDialog := dialog.NewFolderOpen(func(lu fyne.ListableURI, err error) {
@@ -170,9 +205,17 @@ func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
 			fileTree = xWidget.NewFileTree(storage.NewFileURI(lu.Path()))
 			fileTree.OnSelected = CorpusFileTreeOnSelected
 			fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+			defaultContainer.RemoveAll()
 			CorpusFileTreeContainer.Remove(defaultContainer)
 			CorpusFileTreeContainer.Add(fileTree)
 			CorpusFileTreeContainer.Refresh()
+
+			lastList := a.Preferences().StringList("recentlyUsedFodlers")
+			lastList = append(lastList, lu.Path())
+			if len(lastList) > 10 {
+				lastList = lastList[1:]
+			}
+			a.Preferences().SetStringList("recentlyUsedFodlers", lastList)
 		}, *myWindow)
 
 		uri, err := storage.ParseURI(CorpusFileBrowserDefaultPath)
@@ -191,7 +234,7 @@ func getLeftPanel(myWindow *fyne.Window) *fyne.Container {
 	})
 	CorpusFileTreeContainer = container.NewBorder(
 		container.NewBorder(nil, nil, nil, wczytajPlikKatalogButton, openFilesButton),
-		nil, nil, nil, defaultContainer)
+		nil, nil, nil, container.NewVScroll(defaultContainer))
 
 	files := widget.NewAccordionItem("Pliki Corpusa", CorpusFileTreeContainer)
 	files.Open = true
@@ -302,17 +345,12 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 	return accordion
 }
 
-var refreshCorpusPreviewFunc func()
-var corpusPreviewContainer *ElementFileContainer
-
-// var corpusPreviewPath string
-
 func isCorpusExtension(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return slices.Contains([]string{".e3d", ".s3d"}, ext)
 }
 
-func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
+func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
 	refreshCorpusPreviewFunc = func() {
 		vBox.RemoveAll()
 		stat, err := os.Stat(SelectedPath)
@@ -362,13 +400,15 @@ func generateRefreshCorpusPreview(vBox *fyne.Container, toolbarLabel *toolbarLab
 			var container *fyne.Container = o.(*fyne.Container)
 			headerLabel := container.Objects[1].(*widget.Label)
 			headerLabel.SetText("Podgląd: " + SelectedPath)
+			compact := a.Preferences().Bool("compact")
+			hideElementsWithZeroMacros := a.Preferences().Bool("hideElementsWithZeroMacros")
 			if corpusPreviewContainer == nil || corpusPreviewContainer.elementFile != elementFileToDisplay {
-				elemFileCon := NewElementFileContainer(elementFileToDisplay)
+				elemFileCon := NewElementFileContainer(elementFileToDisplay, compact, hideElementsWithZeroMacros)
 				corpusPreviewContainer = elemFileCon
 				vBox.Add(elemFileCon)
 			} else {
 				// corpusPreviewContainer.elementFile = elementFileToDisplay
-				corpusPreviewContainer.Update(elementFileToDisplay)
+				corpusPreviewContainer.Update(elementFileToDisplay, compact, hideElementsWithZeroMacros)
 				vBox.Add(corpusPreviewContainer)
 			}
 		}
@@ -405,18 +445,22 @@ func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(resourceFilterSvg, func() {
-			check1 := widget.NewCheck("Pokazuj tylko elementy z przynajmniej jednym makrem", func(b bool) {
-				Settings.hideElementsWithZeroMacros = b
+			checkHideZeroMacrosElements := widget.NewCheck("Pokazuj tylko elementy z przynajmniej jednym makrem", func(b bool) {
+				a.Preferences().SetBool("hideElementsWithZeroMacros", b)
 			})
-			check1.Checked = Settings.hideElementsWithZeroMacros
-			check2 := widget.NewCheck("Kompaktowy widok", func(b bool) {
-				Settings.compact = b
+			checkHideZeroMacrosElements.Checked = a.Preferences().BoolWithFallback("hideElementsWithZeroMacros", true)
+			checkCompact := widget.NewCheck("Kompaktowy widok", func(b bool) {
+				// Settings.compact = b
+				a.Preferences().SetBool("compact", b)
 			})
-			check2.Checked = Settings.compact
+			checkCompact.Checked = a.Preferences().Bool("compact")
+
 			filterDialog := dialog.NewCustom("Filtruj", "Ok", container.NewVBox(
-				check1,
-				check2,
+				checkHideZeroMacrosElements,
+				checkCompact,
+				// checkMinify,
 			), w)
+
 			filterDialog.Show()
 			filterDialog.SetOnClosed(func() {
 				refreshCorpusPreviewFunc()
@@ -427,7 +471,7 @@ func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 		},
 		),
 	)
-	generateRefreshCorpusPreview(vBox, toolbarLabel)
+	generateRefreshCorpusPreview(a, vBox, toolbarLabel)
 
 	scrollable := container.NewScroll(
 		vBox,
@@ -478,14 +522,14 @@ func RunGui() {
 	aboutItem := widget.NewToolbarAction(resourceCorpusreplacerlogoPng, showAbout)
 	settingsAction := widget.NewToolbarAction(resourceGearSvg, openSettings)
 
-	outputButton = NewToolbarButtonWithIcon("Podsumuj i zamień makra", theme.MediaPlayIcon(), onTappedOutputPopup(outputButton, myWindow))
+	outputButton = NewToolbarButtonWithIcon("Podsumuj i zamień makra", theme.MediaPlayIcon(), onTappedOutputPopup(a, outputButton, myWindow))
 	topBar := widget.NewToolbar(
 		aboutItem,
 		settingsAction,
 		widget.NewToolbarSpacer(),
 		outputButton,
 	)
-	left := getLeftPanel(&myWindow)
+	left := getLeftPanel(a, &myWindow)
 	right := getRightPanel(&myWindow)
 	hSplit := container.NewHSplit(left, centerContainer)
 	hSplit.SetOffset(0.2)

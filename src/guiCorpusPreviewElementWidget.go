@@ -29,7 +29,7 @@ type ElementContainer struct {
 	nestedContent    *fyne.Container
 }
 
-func NewElement(element *Element, nestLevel int) *ElementContainer {
+func NewElement(element *Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) *ElementContainer {
 	leftPadding := canvas.NewRectangle(nil)                        // Empty rectangle
 	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
 	h := container.NewHBox(leftPadding)
@@ -87,19 +87,19 @@ func NewElement(element *Element, nestLevel int) *ElementContainer {
 
 	// c.Add(widget.NewLabel("Todo"))
 	for adIndex, _ := range element.Daske.AD {
-		_c := NewPlate(element, adIndex, nestLevel+1)
+		_c := NewPlate(element, adIndex, nestLevel+1, compact)
 		content.Add(_c)
 		p.Add(_c)
 	}
 	ec.ExtendBaseWidget(ec)
 
 	for _, element := range element.ElmList.Elm {
-		_c := NewElement(&element, nestLevel+1)
+		_c := NewElement(&element, nestLevel+1, compact, hideElementsWithZeroMacros)
 		content.Add(_c)
 		nested.Add(_c)
 	}
 	content.Add(widget.NewSeparator())
-	ec.Update(*element, nestLevel) // todo do spearate to Update and UpdateAll?
+	ec.Update(*element, nestLevel, compact, hideElementsWithZeroMacros) // todo do spearate to Update and UpdateAll?
 	return ec
 }
 
@@ -117,9 +117,9 @@ func (ec *ElementContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(ec.all)
 }
 
-func (ec *ElementContainer) Update(element Element, nestLevel int) bool {
+func (ec *ElementContainer) Update(element Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) bool {
 	totalMacros := ElementTotalNumOfMacros(&element)
-	if Settings.hideElementsWithZeroMacros {
+	if hideElementsWithZeroMacros {
 		if totalMacros == 0 {
 			ec.Hide()
 			return true
@@ -139,14 +139,14 @@ func (ec *ElementContainer) Update(element Element, nestLevel int) bool {
 	hiddenPlates := 0
 	for adIndex, _ := range element.Daske.AD {
 		plateCon := ec.platesContainers.Objects[adIndex].(*PlateContainer)
-		if plateCon.Update(&element, adIndex) {
+		if plateCon.Update(&element, adIndex, compact, hideElementsWithZeroMacros) {
 			hiddenPlates++
 		}
 	}
 	hiddenElements := 0
 	for elementListIndex, element := range element.ElmList.Elm {
 		nestedCon := ec.nestedContent.Objects[elementListIndex].(*ElementContainer)
-		if nestedCon.Update(element, nestLevel+1) {
+		if nestedCon.Update(element, nestLevel+1, compact, hideElementsWithZeroMacros) {
 			hiddenElements++
 		}
 	}

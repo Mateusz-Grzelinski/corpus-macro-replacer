@@ -29,8 +29,8 @@ type ElementFileContainer struct {
 	elementContainer []*ElementContainer
 }
 
-func NewElementFileContainer(ef *ElementFile, objects ...fyne.CanvasObject) *ElementFileContainer {
-	c := container.NewVBox(objects...)
+func NewElementFileContainer(ef *ElementFile, compact bool, hideElementsWithZeroMacros bool) *ElementFileContainer {
+	c := container.NewVBox()
 	efc := &ElementFileContainer{
 		content:          c,
 		elementFile:      ef,
@@ -38,7 +38,7 @@ func NewElementFileContainer(ef *ElementFile, objects ...fyne.CanvasObject) *Ele
 	}
 
 	for _, element := range ef.Element {
-		c := NewElement(&element, 0)
+		c := NewElement(&element, 0, compact, hideElementsWithZeroMacros)
 		efc.content.Add(c)
 		efc.elementContainer = append(efc.elementContainer, c)
 	}
@@ -70,11 +70,11 @@ func _elementTotalNumOfMacros(element *Element, accumulate int) int {
 	return numOfMacros
 }
 
-func (efc *ElementFileContainer) Update(elementFile *ElementFile) {
+func (efc *ElementFileContainer) Update(elementFile *ElementFile, compact bool, hideElementsWithZeroMacros bool) {
 	efc.elementFile = elementFile
 	for elementIndex, elementCon := range efc.elementContainer {
 		element := elementFile.Element[elementIndex]
-		elementCon.Update(element, 0)
+		elementCon.Update(element, 0, compact, hideElementsWithZeroMacros)
 	}
 	// efc.Refresh()
 }

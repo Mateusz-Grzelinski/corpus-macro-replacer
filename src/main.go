@@ -16,8 +16,6 @@ import (
 
 const Version = "0.3"
 
-var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true, hideElementsWithZeroMacros: true}
-
 func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
 	for _, makroFile := range makroFiles {
@@ -35,7 +33,7 @@ func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 	return makrosToReplace, nil
 }
 
-func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1) error {
+func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
@@ -69,7 +67,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 					skippedDaske[daskeName]++
 					continue
 				}
-				UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+				UpdateMakro(&oldMakro, newMakro, alwaysConvertLocalToGlobal)
 
 				// todo reorder variables so that ones with the same name are next to each other
 				// oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
@@ -77,7 +75,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 				macrosUpdated++
 				updatedDaske[daskeName]++
 			}
-			if Settings.verbose {
+			if verbose {
 				log.Printf("  Cabinet '%s'\n", element.EName.Value)
 				for _, name := range visitedDaske {
 					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
@@ -113,11 +111,11 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 					skippedDaske[daskeName]++
 					continue
 				}
-				UpdateMakro(&oldMakro, newMakro, Settings.alwaysConvertLocalToGlobal)
+				UpdateMakro(&oldMakro, newMakro, alwaysConvertLocalToGlobal)
 				macrosUpdated++
 				updatedDaske[daskeName]++
 			}
-			if Settings.verbose {
+			if verbose {
 				log.Printf("  Cabinet '%s'\n", element.EName.Value)
 				for _, name := range visitedDaske {
 					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
@@ -129,7 +127,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 		return root
 	}
 
-	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, visitCorpusE3DFile, visitCorpusS3DFile)
+	ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
 	return nil
 }
 
@@ -144,7 +142,7 @@ func FindCorpusFiles(inputFolder string) []string {
 	return foundCorpusFiles
 }
 
-func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string) error {
+func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	inputFolderStat, err := os.Stat(inputFolder)
 	if err != nil {
 		return fmt.Errorf("error reading input folder: %w", err)
@@ -169,7 +167,7 @@ func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFi
 	for _, inputFile := range foundCorpusFiles {
 		relInputFile, _ := filepath.Rel(inputFolder, inputFile)
 		outputFile := filepath.Join(outputFolder, relInputFile)
-		err := ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
+		err := ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, alwaysConvertLocalToGlobal, verbose, minify)
 		if err != nil {
 			if errOut != nil {
 				errOut = fmt.Errorf("%w\n%w", errOut, err)
@@ -209,6 +207,7 @@ It is alternative to doule ticks in macro editor that actually works:
 		flag.PrintDefaults()
 	}
 	var version *bool = flag.Bool("v", false, "print version")
+	var verbose *bool = flag.Bool("verbose", false, "print more output")
 	var input *string = flag.String("input", "", "required. File or dir, must exist. If dir then changes macro recursively for all .E3D files.")
 	var output *string = flag.String("output", "", `required. File or dir, does not need to exist. 
 If input is dir then output must be dir, but will be created if does not exist. Directory structure of input is mirrored.
@@ -227,6 +226,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		os.Exit(0)
 	}
 	if *input == "" && *output == "" && len(makroFiles) == 0 {
+		fmt.Printf("Running GUI. All command line flags are ignored")
 		RunGui()
 		os.Exit(0)
 	}
@@ -240,9 +240,6 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		log.Fatalln("-makroFile can not be empty")
 	}
 
-	Settings.minify = *minify
-	Settings.alwaysConvertLocalToGlobal = *alwaysConvertLocalToGlobal
-
 	statInput, errInput := os.Stat(*input)
 	if errInput != nil {
 		log.Fatalf("input '%s' is invalid: %s", *input, errInput)
@@ -252,7 +249,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		log.Fatalf("output %s already exists. Add --force to override", *output)
 	}
 	if statInput.IsDir() {
-		ReplaceMakroInCorpusFolder(*input, *output, makroFiles)
+		ReplaceMakroInCorpusFolder(*input, *output, makroFiles, *alwaysConvertLocalToGlobal, *verbose, *minify)
 	} else {
 		if errOutput == nil && statOutput.IsDir() || !strings.HasSuffix(strings.ToLower(*output), ".e3d") {
 			var newOutput string = filepath.Join(*output, filepath.Base(*input))
@@ -265,7 +262,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 
 		makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
 		log.Fatalf("can not read makros: %s", err)
-		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace)
+		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace, *alwaysConvertLocalToGlobal, *verbose, *minify)
 	}
 
 	// makroFile := `C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`

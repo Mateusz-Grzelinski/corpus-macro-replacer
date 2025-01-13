@@ -28,7 +28,7 @@ type PlateContainer struct {
 }
 
 // formatka/Daske
-func NewPlate(element *Element, adIndex int, nestLevel int) *PlateContainer {
+func NewPlate(element *Element, adIndex int, nestLevel int, compact bool) *PlateContainer {
 	leftPadding := canvas.NewRectangle(nil)                        // Empty rectangle
 	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
 	h := container.NewHBox(leftPadding)
@@ -77,7 +77,7 @@ func NewPlate(element *Element, adIndex int, nestLevel int) *PlateContainer {
 		_con := NewMacroContainer(nestLevel, pc)
 		c.Add(_con)
 		macrosContainer.Add(_con)
-		_con.Update(&spoj.Makro1) // todo update here?
+		_con.Update(&spoj.Makro1, compact) // todo update here?
 	}
 	stats := widget.NewLabel(fmt.Sprintf("Makra: %d", howMenyMacros))
 	h.Add(stats)
@@ -112,8 +112,8 @@ func DaskeTotalNumOfMacros(element *Element, adIndex int) int {
 	return howManyMacros
 }
 
-func (pc *PlateContainer) Update(element *Element, adIndex int) bool {
-	if Settings.hideElementsWithZeroMacros {
+func (pc *PlateContainer) Update(element *Element, adIndex int, compact bool, hideElementsWithZeroMacros bool) bool {
+	if hideElementsWithZeroMacros {
 		if DaskeTotalNumOfMacros(element, adIndex) == 0 {
 			pc.Hide()
 			return true
@@ -123,7 +123,7 @@ func (pc *PlateContainer) Update(element *Element, adIndex int) bool {
 	}
 	daske := element.Daske
 	ad := daske.AD[adIndex]
-	if Settings.compact {
+	if compact {
 		pc.contentHeader.Hide()
 		pc.isOpen = true
 		pc.content.Show()
@@ -142,7 +142,7 @@ func (pc *PlateContainer) Update(element *Element, adIndex int) bool {
 			continue
 		}
 		macroCon := pc.macrosContainers.Objects[howManyMacros].(*MacroContainer)
-		macroCon.Update(&spoj.Makro1)
+		macroCon.Update(&spoj.Makro1, compact)
 		howManyMacros++
 	}
 	pc.stats.SetText(fmt.Sprintf("Makra: %d", howManyMacros))

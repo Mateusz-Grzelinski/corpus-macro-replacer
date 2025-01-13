@@ -170,11 +170,11 @@ func smartTextComparison(changes []Change) (string, string) {
 	return oldReformatted.String(), newReformatted.String()
 }
 
-func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1) {
+func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	mc.newMakro = newMakro
 	oldMakro := mc.oldMakro
 	if newMakro == nil {
-		mc.Update(mc.oldMakro)
+		mc.Update(mc.oldMakro, compact)
 		if mc.isOpen {
 			mc.contentDiff.Hide()
 			mc.contentRead.Show()
@@ -242,7 +242,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1) {
 	mc.contentRead.Objects[9] = showAllMakro
 }
 
-func (mc *MacroContainer) Update(oldMakro *M1) {
+func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 	mc.oldMakro = oldMakro
 	mc.newMakro = nil
 	var newMakro *M1
@@ -258,7 +258,7 @@ func (mc *MacroContainer) Update(oldMakro *M1) {
 		}
 	}
 	if newMakro != nil {
-		mc.UpdateMacroForDiff(newMakro)
+		mc.UpdateMacroForDiff(newMakro, compact)
 		mc.loadThisMacroButton.Hide()
 		return
 	} else {
@@ -267,7 +267,7 @@ func (mc *MacroContainer) Update(oldMakro *M1) {
 
 	if oldMakro.MakroName == "" {
 		mc.loadThisMacroButton.Disable()
-		if Settings.compact {
+		if compact {
 			mc.openButton.SetText(mc.parentPlate.openButton.Text + "/<Brak nazwy>")
 			mc.contentHeader.Show()
 		} else {
@@ -276,7 +276,7 @@ func (mc *MacroContainer) Update(oldMakro *M1) {
 		}
 	} else {
 		mc.loadThisMacroButton.Enable()
-		if Settings.compact {
+		if compact {
 			mc.openButton.SetText(mc.parentPlate.openButton.Text + "/" + oldMakro.MakroName)
 			mc.contentHeader.Show()
 		} else {

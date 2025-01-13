@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -54,17 +53,17 @@ func removeRelativePrefix(path string) string {
 	return path
 }
 
-func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, err *string) error {
+func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("panic occured: ", r)
 			*err = fmt.Sprintf("⚠ ERROR (panic): %s", inputFile)
 		}
 	}()
-	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
+	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, alwaysConvertLocalToGlobal, verbose, minify)
 }
 
-func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string) {
+func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) {
 	log.Printf("Generating output to: %s", outputDir)
 	// originalStderr := os.Stderr
 	// // Create a pipe to capture stderr
@@ -99,7 +98,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		cleanedRelInputFile := removeRelativePrefix(relInputFile)
 		outputFile := filepath.Join(outputDir, cleanedRelInputFile)
 		var specialError *string = new(string)
-		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, specialError)
+		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, specialError, alwaysConvertLocalToGlobal, verbose, minify)
 		if *specialError != "" {
 			panicErrors = append(panicErrors, *specialError)
 			currentLog = append(currentLog, fmt.Sprint("⚠ FATAL: '%s'", outputFile))
@@ -139,7 +138,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 	os.WriteFile(LogFile, []byte(strings.Join(currentLog, "\n")), 0644)
 }
 
-func onTappedOutputPopup(self widget.ToolbarItem, w fyne.Window) func() {
+func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) func() {
 	var popup *widget.PopUp
 	// Define an action when the "Show Pop-up" button is tapped
 
@@ -150,7 +149,7 @@ func onTappedOutputPopup(self widget.ToolbarItem, w fyne.Window) func() {
 		}
 		outputPath := widget.NewEntry()
 		outputPath.PlaceHolder = CorpusMacroReplacerDefaultPath
-		outputPath.SetText(CorpusMacroReplacerDefaultPath + time.Now().Format("2006-01-02"))
+		// outputPath.SetText(CorpusMacroReplacerDefaultPath + time.Now().Format("2006-01-02"))
 		logData := binding.NewStringList()
 		// logList :=
 		logData.Set([]string{`Wciśnij Wykonaj aby uruchomić. Pliki zostaną nadpisane`})
@@ -202,8 +201,24 @@ func onTappedOutputPopup(self widget.ToolbarItem, w fyne.Window) func() {
 							for _, e := range MacrosToChangeEntries {
 								macrosTochange = append(macrosTochange, e.Text)
 							}
-							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange)
+							alwaysConvertLocalToGlobal := a.Preferences().Bool("alwaysConvertLocalToGlobal")
+							verbose := a.Preferences().Bool("minify")
+							minify := a.Preferences().Bool("verbose")
+							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, alwaysConvertLocalToGlobal, verbose, minify)
 							logWindow.Refresh()
+						}),
+						widget.NewButtonWithIcon("", theme.MoreVerticalIcon(), func() {
+							checkMinify := widget.NewCheck("Zmniejsz rozmiar plików (eksperymentalne)", func(b bool) {
+								a.Preferences().SetBool("minfy", b)
+							})
+							checkMinify.Checked = a.Preferences().Bool("minify")
+
+							checkVerbose := widget.NewCheck("Więcej logów (widoczne w terminalu)", func(b bool) {
+								a.Preferences().SetBool("verbose", b)
+							})
+							checkVerbose.Checked = a.Preferences().Bool("verbose")
+							popup := dialog.NewCustom("Ustawienia wynikowych plików", "Ok", container.NewVBox(checkMinify, checkVerbose), w)
+							popup.Show()
 						}),
 					),
 					outputPath,

@@ -38,12 +38,3 @@ const (
 	*/
 	// KeepLocalIfHasCondition
 )
-
-type ProgramSettings struct {
-	minify                     bool
-	alwaysConvertLocalToGlobal bool
-	verbose                    bool
-	hideElementsWithZeroMacros bool
-	compact                    bool
-	// convertLocalVariablesToGlobal ConvertLocalVariablesToGlobal
-}
