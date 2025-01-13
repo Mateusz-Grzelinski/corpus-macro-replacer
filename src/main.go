@@ -18,29 +18,27 @@ const Version = "0.3"
 
 var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true, hideElementsWithZeroMacros: true}
 
-func ReadMakrosFromCMK(makroFiles []string) map[string]*M1 {
+func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
 	for _, makroFile := range makroFiles {
 		absPathMakroFile := strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
 		_, exists := makrosToReplace[absPathMakroFile]
 		if exists {
-			log.Fatalf("Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
+			log.Printf("Warning: Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
 		}
 		makro, err := LoadMakroFromCMKFile(makroFile)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		makrosToReplace[absPathMakroFile] = makro
 	}
-	return makrosToReplace
+	return makrosToReplace, nil
 }
 
-// func updateElements()
-
-func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1) {
+func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1) error {
 	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
-		log.Fatalf("Can not create path: %s", outputFile)
+		return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
 	}
 
 	macrosUpdated := 0
@@ -132,6 +130,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 	}
 
 	ReadWriteCorpusFile(inputFile, outputFile, Settings.minify, visitCorpusE3DFile, visitCorpusS3DFile)
+	return nil
 }
 
 func FindCorpusFiles(inputFolder string) []string {
@@ -145,29 +144,44 @@ func FindCorpusFiles(inputFolder string) []string {
 	return foundCorpusFiles
 }
 
-func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string) {
+func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string) error {
 	inputFolderStat, err := os.Stat(inputFolder)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error reading input folder: %w", err)
 	}
 	if !inputFolderStat.IsDir() {
-		log.Fatalf("%s must be a directory", inputFolder)
+		return fmt.Errorf("%s must be a directory", inputFolder)
 	}
 	err = os.MkdirAll(outputFolder, os.ModePerm)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("can not create dir: %w", err)
 	}
 
 	foundCorpusFiles := FindCorpusFiles(inputFolder)
 
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
-	makrosToReplace := ReadMakrosFromCMK(makroFiles)
+	makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+	if err != nil {
+		return fmt.Errorf("error reading CMK macros: %w", err)
+	}
+	var errOut error
 	for _, inputFile := range foundCorpusFiles {
 		relInputFile, _ := filepath.Rel(inputFolder, inputFile)
 		outputFile := filepath.Join(outputFolder, relInputFile)
-		ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
+		err := ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
+		if err != nil {
+			if errOut != nil {
+				errOut = fmt.Errorf("%w\n%w", errOut, err)
+			} else {
+				errOut = fmt.Errorf("%w", err)
+			}
+		}
 	}
+	if errOut != nil {
+		return errOut
+	}
+	return nil
 }
 
 type arrayFlags []string
@@ -249,7 +263,8 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 			log.Fatalf("output %s already exists. Add --force to override", *output)
 		}
 
-		makrosToReplace := ReadMakrosFromCMK(makroFiles)
+		makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+		log.Fatalf("can not read makros: %s", err)
 		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace)
 	}
 

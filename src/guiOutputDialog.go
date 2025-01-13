@@ -16,6 +16,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+const LogFile = "Corpus_Macro_Replacer_log.txt"
+
 func NewPopupListOfFiles(w fyne.Window, files []string) *widget.List {
 	return widget.NewList(
 		func() int {
@@ -52,17 +54,15 @@ func removeRelativePrefix(path string) string {
 	return path
 }
 
-func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, err *string) {
+func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, err *string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("panic occured: ", r)
-			*err = fmt.Sprintf("⚠ ERROR: %s", inputFile)
+			*err = fmt.Sprintf("⚠ ERROR (panic): %s", inputFile)
 		}
 	}()
-	ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
+	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace)
 }
-
-const LogFile = "Corpus_Macro_Replacer_log.txt"
 
 func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string) {
 	log.Printf("Generating output to: %s", outputDir)
@@ -77,20 +77,36 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 	// todo make panic handler to write to stderr
 
 	// var buf bytes.Buffer
-	makrosToReplace := ReadMakrosFromCMK(makroFiles)
-	errored := []string{}
+	makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+	currentLog, _ := logData.Get()
+	if err != nil {
+		log.Println(err)
+		currentLog = append(currentLog, fmt.Sprintf("⚠ ERROR: Przerwano, bo: %s", err))
+		logData.Set(currentLog)
+		return
+	}
+	if len(makrosToReplace) == 0 {
+		log.Println(err)
+		currentLog = append(currentLog, fmt.Sprintf("⚠ ERROR: Nie znaleziono żadnych makr: %s", makroFiles))
+		logData.Set(currentLog)
+		return
+	}
+	panicErrors := []string{}
+	normalErrors := []error{}
 	for i, inputFile := range foundCorpusFiles {
-		currentLog, _ := logData.Get()
 		currentLog = append(currentLog, fmt.Sprintf("%d/%d: %s", i+1, len(foundCorpusFiles), inputFile))
 		relInputFile, _ := filepath.Rel(outputDir, inputFile)
 		cleanedRelInputFile := removeRelativePrefix(relInputFile)
 		outputFile := filepath.Join(outputDir, cleanedRelInputFile)
-		var err *string = new(string)
-		WriteOutputTask(inputFile, outputFile, makrosToReplace, err)
-		if *err != "" {
-			errored = append(errored, *err)
-		} else {
-			currentLog = append(currentLog, "Zapinano: "+outputFile)
+		var specialError *string = new(string)
+		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, specialError)
+		if *specialError != "" {
+			panicErrors = append(panicErrors, *specialError)
+			currentLog = append(currentLog, fmt.Sprint("⚠ FATAL: '%s'", outputFile))
+		}
+		if err != nil {
+			normalErrors = append(normalErrors, err)
+			currentLog = append(currentLog, fmt.Sprintf("⚠ ERROR: '%s' %s", outputFile, err))
 		}
 		// _, err := io.Copy(&buf, r)
 		// fmt.Print(err)
@@ -98,14 +114,21 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		// logWindow.Set(append(current, buf.String()))
 		logData.Set(currentLog)
 	}
-	currentLog, _ := logData.Get()
-	if len(errored) != 0 {
-		message := fmt.Sprintf("⚠ W %d plikach wystąpiły błędy", len(errored))
+	if len(normalErrors) != 0 {
+		message := fmt.Sprintf("⚠ W %d plikach wystąpiły błędy", len(normalErrors))
 		log.Println(message)
-		log.Println(errored)
+		log.Println(normalErrors)
 
 		currentLog = append(currentLog, message)
-		currentLog = append(currentLog, errored...)
+		currentLog = append(currentLog, panicErrors...)
+	}
+	if len(panicErrors) != 0 {
+		message := fmt.Sprintf("⚠ W %d plikach wystąpiły nietypowe błędy", len(panicErrors))
+		log.Println(message)
+		log.Println(panicErrors)
+
+		currentLog = append(currentLog, message)
+		currentLog = append(currentLog, panicErrors...)
 	}
 	// os.Stderr = originalStderr
 	// w.Close()

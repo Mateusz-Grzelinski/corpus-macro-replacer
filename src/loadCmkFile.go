@@ -64,6 +64,9 @@ const M1InitialMacroMarker string = ""
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
 func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
+	if makroFile == "" {
+		return nil, fmt.Errorf("missing input makro file")
+	}
 	makroFile, _ = filepath.Abs(makroFile)
 	initialMakro, err := partialLoadMakroFromCMKFile(makroFile)
 	if err != nil {
@@ -127,7 +130,7 @@ func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	for _, macro := range resolveSubMakros {
 		for _, submacro := range macro.Makro {
 			if submacro.MAK == nil && submacro.EmbeddedMakroName != "" {
-				log.Printf("ERROR: Makro '%s' not loaded properly! This might be a bug.", submacro.EmbeddedMakroName)
+				return nil, fmt.Errorf("ERROR: Makro '%s' not loaded properly! This might be a bug.", submacro.EmbeddedMakroName)
 			}
 		}
 	}
@@ -141,6 +144,13 @@ func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	file, err := os.Open(makroFile)
 	if err != nil {
 		return nil, err
+	}
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if stat.IsDir() {
+		return nil, fmt.Errorf("makro file is directory %s", makroFile)
 	}
 	defer file.Close()
 
@@ -163,7 +173,7 @@ func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
 		if strings.HasPrefix(text, "[") {
 			matched := SectionRegex.FindStringSubmatch(text)
 			if matched == nil {
-				return nil, fmt.Errorf("%s was parsed badly, was looking for section name", text)
+				return nil, fmt.Errorf("%s was parsed badly, was looking start of section name, got nil", text)
 			}
 			fullSectionName, sectionName := matched[1], matched[2]
 			allSections[fullSectionName]++
