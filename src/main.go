@@ -14,6 +14,8 @@ import (
 
 //go:generate fyne bundle -o src/bundled.go assets
 
+const Version = "0.3"
+
 var Settings ProgramSettings = ProgramSettings{minify: false, alwaysConvertLocalToGlobal: false, verbose: true, hideElementsWithZeroMacros: true}
 
 func ReadMakrosFromCMK(makroFiles []string) map[string]*M1 {
@@ -207,7 +209,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 	flag.Parse()
 
 	if *version {
-		fmt.Println("Corpus_Macro_Replacer v0.2")
+		fmt.Printf("Corpus_Macro_Replacer v%s\n", Version)
 		os.Exit(0)
 	}
 	if *input == "" && *output == "" && len(makroFiles) == 0 {

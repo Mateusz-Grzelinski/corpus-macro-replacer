@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/cmd/fyne_settings/settings"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
@@ -394,11 +395,10 @@ func addToLoadedFilesAndRefresh(path string) {
 	}
 }
 
-func getCenterPanel(w fyne.Window) *fyne.Container {
+func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 	vBox := container.NewVBox()
 	// centerViewWithCorpusPreview = vBox // setting global reference, not ideal...
 	toolbarLabel := NewToolbarLabel("Wybierz plik aby podejrzeć")
-
 	topBar := widget.NewToolbar(
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
@@ -435,19 +435,51 @@ func getCenterPanel(w fyne.Window) *fyne.Container {
 	return centerPanel
 }
 
+func parseURL(urlStr string) *url.URL {
+	link, err := url.Parse(urlStr)
+	if err != nil {
+		fyne.LogError("Could not parse URL", err)
+	}
+
+	return link
+}
+
 func RunGui() {
-	myApp := app.NewWithID("pl.net.stolarz")
-	myWindow := myApp.NewWindow("Corpus Makro Replacer")
+	a := app.NewWithID("pl.net.stolarz")
+	myWindow := a.NewWindow("Corpus Makro Replacer")
 	myWindow.SetIcon(resourceCorpusreplacerlogoPng)
 
-	centerContainer := getCenterPanel(myWindow)
+	centerContainer := getCenterPanel(a, myWindow)
 	logo := canvas.NewImageFromResource(resourceCorpusreplacerlogoPng)
 	logo.FillMode = canvas.ImageFillStretch
 	logo.SetMinSize(fyne.NewSize(30, 30))
 
 	var outputButton widget.ToolbarItem
+
+	openSettings := func() {
+		w := a.NewWindow("Ustawienia")
+		w.SetContent(settings.NewSettings().LoadAppearanceScreen(w))
+		w.Resize(fyne.NewSize(440, 520))
+		w.SetIcon(resourceCorpusreplacerlogoPng)
+		w.Show()
+	}
+	showAbout := func() {
+		w := a.NewWindow("O programie")
+		w.SetIcon(resourceCorpusreplacerlogoPng)
+		w.SetContent(container.NewVBox(
+			widget.NewLabel(fmt.Sprintf("Version: %s", Version)),
+			widget.NewLabel("Author: Mateusz Grzeliński"),
+			widget.NewHyperlink("Source & documentation", parseURL("https://github.com/Mateusz-Grzelinski/corpus-macro-replacer.git")),
+		))
+		w.Show()
+	}
+	aboutItem := widget.NewToolbarAction(resourceCorpusreplacerlogoPng, showAbout)
+	settingsAction := widget.NewToolbarAction(resourceGearSvg, openSettings)
+
 	outputButton = NewToolbarButtonWithIcon("Podsumuj i zamień makra", theme.MediaPlayIcon(), onTappedOutputPopup(outputButton, myWindow))
 	topBar := widget.NewToolbar(
+		aboutItem,
+		settingsAction,
 		widget.NewToolbarSpacer(),
 		outputButton,
 	)
@@ -457,7 +489,7 @@ func RunGui() {
 	hSplit.SetOffset(0.2)
 	center := container.NewHSplit(hSplit, right)
 	center.SetOffset(0.8)
-	var border *fyne.Container = container.NewBorder(container.NewBorder(nil, nil, logo, nil, topBar), nil, nil, nil, center)
+	var border *fyne.Container = container.NewBorder(container.NewBorder(nil, nil, nil, nil, topBar), nil, nil, nil, center)
 
 	myWindow.SetContent(border)
 	myWindow.Resize(fyne.NewSize(1000, 700))
