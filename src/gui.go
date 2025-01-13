@@ -284,9 +284,11 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 	addMakroButton.OnTapped()
 
 	item1 := widget.NewAccordionItem("Makra do zamiany",
-		container.NewVBox(
-			addMakroButton,
-			macrosToChangeContainer,
+		container.NewScroll(
+			container.NewVBox(
+				addMakroButton,
+				macrosToChangeContainer,
+			),
 		),
 	)
 	item1.Open = true
