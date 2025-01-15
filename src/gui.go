@@ -437,7 +437,7 @@ func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 	topBar := widget.NewToolbar(
 		toolbarLabel,
 		widget.NewToolbarSpacer(),
-		widget.NewToolbarAction(resourceFilterSvg, func() {
+		widget.NewToolbarAction(theme.Icon("filter"), func() {
 			checkHideZeroMacrosElements := widget.NewCheck("Pokazuj tylko elementy z przynajmniej jednym makrem", func(b bool) {
 				a.Preferences().SetBool("hideElementsWithZeroMacros", b)
 			})
@@ -487,6 +487,9 @@ func RunGui() {
 	a := app.NewWithID("pl.net.stolarz")
 	myWindow := a.NewWindow("Corpus Makro Replacer")
 	myWindow.SetIcon(resourceCorpusreplacerlogoPng)
+	customTheme := NewCustomTheme(theme.DefaultTheme())
+	///resourceFilterSvg
+	a.Settings().SetTheme(customTheme)
 
 	centerContainer := getCenterPanel(a, myWindow)
 	logo := canvas.NewImageFromResource(resourceCorpusreplacerlogoPng)
@@ -513,7 +516,7 @@ func RunGui() {
 		w.Show()
 	}
 	aboutItem := widget.NewToolbarAction(resourceCorpusreplacerlogoPng, showAbout)
-	settingsAction := widget.NewToolbarAction(resourceGearSvg, openSettings)
+	settingsAction := widget.NewToolbarAction(theme.Icon("gear"), openSettings)
 
 	outputButton = NewToolbarButtonWithIcon("Podsumuj i zamień makra", theme.MediaPlayIcon(), onTappedOutputPopup(a, outputButton, myWindow))
 	topBar := widget.NewToolbar(

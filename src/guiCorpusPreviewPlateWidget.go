@@ -61,7 +61,7 @@ func NewPlate(element *Element, adIndex int, nestLevel int, compact bool) *Plate
 			openButton.Refresh()
 		})
 
-	iconWidget := widget.NewIcon(resourceBox3Svg)
+	iconWidget := widget.NewIcon(theme.Icon("box3"))
 	h.Add(iconWidget)
 	h.Add(openButton)
 	pc.openButton = openButton

@@ -62,18 +62,18 @@ func NewElement(element *Element, nestLevel int, compact bool, hideElementsWithZ
 			}
 			openButton.Refresh()
 		})
-	var icon *fyne.StaticResource
+	var icon fyne.Resource
 	switch nestLevel {
 	case 0:
-		icon = resourceCabinetSvg
+		icon = theme.Icon("cabinet")
 	case 1:
-		icon = resourceBoxRecurse1Svg
+		icon = theme.Icon("boxRecurse1")
 	case 2:
-		icon = resourceBoxRecurse2Svg
+		icon = theme.Icon("boxRecurse2")
 	case 3:
-		icon = resourceBoxRecurse3Svg
+		icon = theme.Icon("boxRecurse3")
 	default:
-		icon = resourceBox3Svg
+		icon = theme.Icon("box3")
 	}
 	iconWidget := widget.NewIcon(icon)
 	h.Add(iconWidget)

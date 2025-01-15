@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-//go:generate fyne bundle -o src/bundled.go assets
+//go:generate fyne bundle -o src/bundled.go assets/
 
 const Version = "0.3"
 

@@ -15,8 +15,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-var macroIcon *canvas.Image = canvas.NewImageFromResource(resourceMacroSvg)
-
 type MacroContainer struct {
 	widget.BaseWidget
 	all           *fyne.Container
