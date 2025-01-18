@@ -268,14 +268,19 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 	addMakroButton = widget.NewButton("Dodaj makro do zamiany", func() {
 		newMacroInput := widget.NewEntry()
 		newEntryLabel := widget.NewLabelWithStyle("Nic nie wybrano", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-		newEntryLabel.Truncation = fyne.TextTruncateEllipsis
+		// newEntryLabel.Truncation = fyne.TextTruncateEllipsis
+		newEntryLabel.Wrapping = fyne.TextWrapBreak
 		newMacroInput.SetPlaceHolder(`C:\Tri D Corpus\Corpus 5.0\Makro\*.CMK`)
 		newMacroInput.OnChanged = func(path string) {
-			stat, err := os.Stat(path)
-			if err == nil && stat != nil && !stat.IsDir() {
-				newEntryLabel.SetText(getMacroName(path))
+			// wasteful but the best error reporting
+			_, err := LoadMakroFromCMKFile(path)
+			if err != nil {
+				log.Printf("ERROR: reading makro failed: %s\n", err)
+				newEntryLabel.SetText(fmt.Sprintf("ERROR: %s", err))
+				newEntryLabel.Importance = widget.DangerImportance
 			} else {
-				newEntryLabel.SetText("Plik nie istnieje!")
+				newEntryLabel.SetText(path)
+				newEntryLabel.Importance = widget.MediumImportance
 			}
 			newEntryLabel.Refresh()
 		}

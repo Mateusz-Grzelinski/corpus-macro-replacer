@@ -14,21 +14,10 @@ type CustomTheme struct {
 }
 
 func NewCustomTheme(base fyne.Theme) *CustomTheme {
-	customTheme := CustomTheme{
+	return &CustomTheme{
 		darkIcons: make(map[fyne.ThemeIconName]fyne.Resource),
 		baseTheme: base,
 	}
-
-	customTheme.SetIcon("box3", resourceBox3Svg)
-	customTheme.SetIcon("boxRecurse1", resourceBoxRecurse1Svg)
-	customTheme.SetIcon("boxRecurse2", resourceBoxRecurse2Svg)
-	customTheme.SetIcon("boxRecurse3", resourceBoxRecurse3Svg)
-	customTheme.SetIcon("cabinet", resourceCabinetSvg)
-	customTheme.SetIcon("filter", resourceFilterSvg)
-	customTheme.SetIcon("gear", resourceGearSvg)
-	customTheme.SetIcon("checkMinux", resourceCheckMinusSvg)
-
-	return &customTheme
 }
 
 func (c *CustomTheme) SetIcon(name fyne.ThemeIconName, darkIcon fyne.Resource) {
@@ -36,6 +25,10 @@ func (c *CustomTheme) SetIcon(name fyne.ThemeIconName, darkIcon fyne.Resource) {
 }
 
 func (c *CustomTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
+	// variant := fyne.CurrentApp().Settings().Theme().
+	// theme.Current()
+	// variant := fyne.CurrentApp().Settings().ThemeVariant()
+	// if theme.VariantDark == variant {
 	if icon, exists := c.darkIcons[name]; exists {
 		return theme.NewThemedResource(icon)
 	}

@@ -244,14 +244,14 @@ func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 	mc.oldMakro = oldMakro
 	mc.newMakro = nil
 	var newMakro *M1
-	for _, makroTochangeName := range MacrosToChangeEntries {
-		newMakroName := getMacroName(makroTochangeName.Text)
+	for _, makroToChangeName := range MacrosToChangeEntries {
+		newMakroName := getMacroName(makroToChangeName.Text)
 		if oldMakro.MakroName == newMakroName {
-			makro, err := LoadMakroFromCMKFile(makroTochangeName.Text)
-			newMakro = makro
+			makro, err := LoadMakroFromCMKFile(makroToChangeName.Text)
 			if err != nil {
-				log.Println(err)
+				log.Printf("ERROR: reading makro failed: %s\n", err)
 			}
+			newMakro = makro
 			break
 		}
 	}
