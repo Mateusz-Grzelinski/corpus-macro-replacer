@@ -22,8 +22,15 @@ import (
 	xWidget "fyne.io/x/fyne/widget"
 )
 
-const CorpusMacroReplacerDefaultPath = `C:\Tri D Corpus\CorpusMacroReplacer\`
-const CorpusFileBrowserDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
+const (
+	CorpusMacroReplacerDefaultPath = `C:\Tri D Corpus\CorpusMacroReplacer\`
+	CorpusFileBrowserDefaultPath   = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
+	MacrosDefaultPathNormal        = `C:\Tri D Corpus\Corpus 5.0\Makro\`
+	MacrosDefaultPath              = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
+)
+
+var corpusMimeType = []string{"text/plain"}
+var corpustExtensions = []string{".s3d", ".e3d"} // use with strings.Fold
 
 var CorpusTypicallyUsedFolders = []string{
 	`C:\Tri D Corpus\Corpus 4.0\elmsav\`,
@@ -34,20 +41,17 @@ var CorpusTypicallyUsedFolders = []string{
 	`C:\Tri D Corpus\Corpus 6.0\sobasav\`,
 }
 
-const MacrosDefaultPathNormal = `C:\Tri D Corpus\Corpus 5.0\Makro\`
-const MacrosDefaultPath = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
-
 var loadedS3DFileForPreview *ProjectFile
 var loadedE3DFileForPreview *ElementFile
 var loadedFileForPreviewError error
 var SelectedPath string
+var corpusPreviewContainer *ElementFileContainer
+var ListOfLoadedFilesContainer *fyne.Container
+var MacrosToChangeEntries []*widget.Entry
+var addMakroButton *widget.Button
+var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
 var refreshCorpusPreviewFunc func()
-var corpusPreviewContainer *ElementFileContainer
-
-var ListOfLoadedFilesContainer *fyne.Container
-
-var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
 var loadedFiles []struct {
 	path   string
@@ -176,8 +180,7 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 				CorpusFileTreeContainer.Remove(fileTree)
 				fileTree = xWidget.NewFileTree(storage.NewFileURI(p))
 				fileTree.OnSelected = CorpusFileTreeOnSelected
-				// todo filter extension but allow directory
-				// fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+				fileTree.Filter = storage.NewMimeTypeFileFilter(corpusMimeType)
 				defaultContainer.RemoveAll()
 				CorpusFileTreeContainer.Remove(defaultContainer)
 				CorpusFileTreeContainer.Add(fileTree)
@@ -197,7 +200,7 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 			CorpusFileTreeContainer.Remove(fileTree)
 			fileTree = xWidget.NewFileTree(storage.NewFileURI(lu.Path()))
 			fileTree.OnSelected = CorpusFileTreeOnSelected
-			fileTree.Filter = storage.NewExtensionFileFilter([]string{".S3D", ".E3D"})
+			fileTree.Filter = storage.NewExtensionFileFilter(corpustExtensions)
 			defaultContainer.RemoveAll()
 			CorpusFileTreeContainer.Remove(defaultContainer)
 			CorpusFileTreeContainer.Add(fileTree)
@@ -234,8 +237,6 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	return CorpusFileTreeContainer
 }
 
-var MacrosToChangeEntries []*widget.Entry
-
 func getMacroName(path string) string {
 	base, found := strings.CutSuffix(path, ".CMK") // todo sla
 	if found {
@@ -259,8 +260,6 @@ func RemoveFromSlice(rem *widget.Entry) {
 		return
 	}
 }
-
-var addMakroButton *widget.Button
 
 func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 	macrosToChangeContainer := container.NewVBox()
@@ -344,8 +343,9 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 }
 
 func isCorpusExtension(path string) bool {
+	// todo use strings.EqualFold()?
 	ext := strings.ToLower(filepath.Ext(path))
-	return slices.Contains([]string{".e3d", ".s3d"}, ext)
+	return slices.Contains(corpustExtensions, ext)
 }
 
 func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
@@ -448,7 +448,6 @@ func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 			})
 			checkHideZeroMacrosElements.Checked = a.Preferences().BoolWithFallback("hideElementsWithZeroMacros", true)
 			checkCompact := widget.NewCheck("Kompaktowy widok", func(b bool) {
-				// Settings.compact = b
 				a.Preferences().SetBool("compact", b)
 			})
 			checkCompact.Checked = a.Preferences().Bool("compact")
@@ -456,7 +455,6 @@ func getCenterPanel(a fyne.App, w fyne.Window) *fyne.Container {
 			filterDialog := dialog.NewCustom("Filtruj", "Ok", container.NewVBox(
 				checkHideZeroMacrosElements,
 				checkCompact,
-				// checkMinify,
 			), w)
 
 			filterDialog.Show()
