@@ -16,9 +16,9 @@ var testFilesE3D = []string{
 }
 
 func TestLoadMakroFromCMKFile(t *testing.T) {
-	for _, testFile := range testFilesE3D {
-		simple_path := filepath.Join(pathToTestData, testFile)
-		elementFile, err := NewCorpusFile(simple_path)
+	for _, testFile := range testFilesMakroCollection {
+		simple_path := filepath.Join(pathToTestMakroCollection, testFile)
+		_, elementFile, err := NewCorpusFile(simple_path)
 		if err != nil {
 			t.Error(err)
 		}
@@ -31,8 +31,8 @@ func isSimilar(t *testing.T, originalPath string, encoded string) bool {
 	return true
 }
 func TestLoadMakroFromCMKFileSimpleInSimple(t *testing.T) {
-	simple_path := filepath.Join(pathToTestData, "simple_in_simple.E3D")
-	elementFile, err := NewCorpusFile(simple_path)
+	simple_path := filepath.Join(pathToTestMakroCollection, "simple_in_simple.E3D")
+	_, elementFile, err := NewCorpusFile(simple_path)
 	if err != nil {
 		t.Error(err)
 	}
