@@ -102,7 +102,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, specialError, alwaysConvertLocalToGlobal, verbose, minify)
 		if *specialError != "" {
 			panicErrors = append(panicErrors, *specialError)
-			currentLog = append(currentLog, fmt.Sprint("⚠ FATAL: '%s'", outputFile))
+			currentLog = append(currentLog, fmt.Sprintf("⚠ FATAL: '%s'", outputFile))
 		}
 		if err != nil {
 			normalErrors = append(normalErrors, err)
