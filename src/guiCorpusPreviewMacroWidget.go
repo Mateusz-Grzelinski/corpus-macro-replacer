@@ -184,11 +184,15 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	}
 	mc.contentRead.Hide()
 
-	mc.openButton.SetText(cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+	if compact {
+		mc.openButton.SetText(mc.parentPlate.openButton.Text + cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+	} else {
+		mc.openButton.SetText(cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+	}
 	mc.contentHeader.Refresh()
 
 	// todo only varijable changes are returned
-	{
+	{ // VARIJABLE
 		varijableChanges := UpdateMakro(mc.oldMakro, mc.newMakro, false)
 		old, new := smartTextComparison(varijableChanges)
 		newText := "```\n[VARIJABLE]\n// po zaktualizowaniu z pliku .CMK, " + new + "```"
@@ -201,7 +205,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 		split.Offset = 0.4
 		mc.contentDiff.Objects[0] = split
 	}
-	{
+	{ // JOINT
 		new, old := "", ""
 		if newMakro.Joint != nil {
 			new = strings.Join(decodeAllCMKLines(newMakro.Joint.DAT), "\n")
@@ -210,10 +214,10 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 			old = strings.Join(decodeAllCMKLines(oldMakro.Joint.DAT), "\n")
 		}
 		if new != "" || old != "" {
-			newText := "```\n[JOINT]\n// po zaktualizowaniu z pliku .CMK\n" + new + "\n```"
+			newText := "```\n[JOINT]\n" + new + "\n```"
 			newVarijableRichText := widget.NewRichTextFromMarkdown(newText)
 			newVarijableRichText.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			oldText := "```\n[JOINT]\n// wczytane z corpusa\n" + old + "\n```"
+			oldText := "```\n[JOINT]\n" + old + "\n```"
 			oldVarijableRichText := widget.NewRichTextFromMarkdown(oldText)
 			oldVarijableRichText.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
 			split := container.NewHSplit(oldVarijableRichText, newVarijableRichText)
@@ -221,23 +225,70 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 			mc.contentDiff.Objects[1] = split
 		}
 	}
+
 	var showAllMakro *widget.Button
-	showAllMakro = widget.NewButton("Pokaż całe makro", func() {
+
+	showAllMakro = widget.NewButton("Pokaż całe makro wczytane z pliku .CMK", func() {
 		showAllMakro.Hide()
-		if oldMakro.Formule != nil {
-			textOld := "```[FORMULE]\n// formule jest zawsze wczytywane z pliku .CMK\n" + strings.Join(decodeAllCMKLines(cmp.Or(newMakro.Formule.DAT, "")), "\n") + "\n```"
+
+		if newMakro.Formule != nil {
+			textOld := "```\n[FORMULE]\n// formule jest wczytywane z pliku .CMK\n" + strings.Join(decodeAllCMKLines(cmp.Or(newMakro.Formule.DAT, "")), "\n") + "\n```"
 			multilineOld := widget.NewRichTextFromMarkdown(textOld)
 			multilineOld.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
-			mc.contentRead.Objects[2] = multilineOld
+			mc.contentDiff.Objects[2] = multilineOld
 		}
-		mc.contentRead.Objects[8] = widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {
+
+		pocketVBox := mc.contentDiff.Objects[3].(*fyne.Container)
+		pocketVBox.RemoveAll()
+		for i, item := range newMakro.Pocket {
+			text := "`[POCKET" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multiline := widget.NewRichTextFromMarkdown(text)
+			multiline.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			pocketVBox.Add(multiline)
+		}
+		potrosniVBox := mc.contentDiff.Objects[4].(*fyne.Container)
+		potrosniVBox.RemoveAll()
+		for i, item := range newMakro.Potrosni {
+			text := "`[POTROSNI" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multiline := widget.NewRichTextFromMarkdown(text)
+			multiline.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			pocketVBox.Add(multiline)
+		}
+		grupaVBox := mc.contentDiff.Objects[5].(*fyne.Container)
+		grupaVBox.RemoveAll()
+		for i, item := range newMakro.Grupa {
+			text := "`[GRUPA" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multiline := widget.NewRichTextFromMarkdown(text)
+			multiline.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			grupaVBox.Add(multiline)
+		}
+		rasterVBox := mc.contentDiff.Objects[6].(*fyne.Container)
+		rasterVBox.RemoveAll()
+		for i, item := range newMakro.Raster {
+			text := "`[RASTER" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multiline := widget.NewRichTextFromMarkdown(text)
+			multiline.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			rasterVBox.Add(multiline)
+		}
+		makroVBox := mc.contentDiff.Objects[7].(*fyne.Container)
+		makroVBox.RemoveAll()
+		for i, item := range newMakro.Makro {
+			textOld := "`[MAKRO" + strconv.Itoa(i) + "]`\n\n```\n" + strings.Join(decodeAllCMKLines(cmp.Or(item.DAT, "")), "\n") + "\n```"
+			multiline := widget.NewRichTextFromMarkdown(textOld)
+			multiline.Wrapping = fyne.TextWrap(fyne.TextTruncateClip)
+			makroVBox.Add(multiline)
+		}
+
+		mc.contentDiff.Objects[8] = widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {
+			showAllMakro.Show()
 			mc.contentDiff.Hide()
-			mc.contentHeader.Objects[0].(*widget.Button).SetIcon(theme.VisibilityIcon())
+			mc.openButton.SetIcon(theme.VisibilityIcon())
 			mc.contentHeader.Refresh()
 			mc.isOpen = false
 		})
 	})
-	mc.contentRead.Objects[9] = showAllMakro
+
+	mc.contentDiff.Objects[9] = showAllMakro
 }
 
 func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {

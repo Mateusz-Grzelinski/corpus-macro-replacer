@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -148,8 +149,8 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 			foundCorpusFiles = append(foundCorpusFiles, FindCorpusFiles(dirOrFile.path)...)
 		}
 		outputPath := widget.NewEntry()
-		outputPath.PlaceHolder = CorpusMacroReplacerDefaultPath
-		// outputPath.SetText(CorpusMacroReplacerDefaultPath + time.Now().Format("2006-01-02"))
+		// outputPath.PlaceHolder = CorpusMacroReplacerDefaultPath
+		outputPath.SetText(CorpusMacroReplacerDefaultPath + time.Now().Format("2006-01-02"))
 		logData := binding.NewStringList()
 		// logList :=
 		logData.Set([]string{`Wciśnij Wykonaj aby uruchomić. Pliki zostaną nadpisane`})
