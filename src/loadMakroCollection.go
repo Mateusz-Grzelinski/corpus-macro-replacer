@@ -8,17 +8,39 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"unicode/utf8"
 )
 
-type MakroName string
-type MakroPath string
-type MakroNameMapping map[MakroName]MakroPath
-type MakroCollection []*MakroCollectionItem
+type MakroCollection []MakroCollectionItem
+
+func (mc *MakroCollection) GetMacroNameByFileName(path string) *string {
+	// if MakroCollectionCache == nil {
+	// 	return nil
+	// }
+	for _, mcc := range MakroCollectionCache {
+		absCorpusPath, err1 := filepath.Abs(string(mcc.FileName))
+		absMakroPath, err2 := filepath.Abs(path)
+		if err1 != nil && err2 != nil && absCorpusPath == absMakroPath {
+			tmp := string(mcc.Name)
+			return &tmp
+		}
+	}
+	return nil
+}
+func (mc *MakroCollection) GetMacroFileNameByName(name string) *string {
+	for _, mcc := range *mc {
+		if mcc.Name == name {
+			tmp := string(mcc.FileName)
+			return &tmp
+		}
+	}
+	return nil
+}
 
 type MakroCollectionItem struct {
-	FileName    MakroPath
-	Name        MakroName
+	FileName    string
+	Name        string
 	Category    string
 	TextColorFG color.Color
 	TextColorBG color.Color
@@ -63,8 +85,7 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 	for {
 		b, err := br.ReadByte()
 		if err != nil && !errors.Is(err, io.EOF) {
-			fmt.Println(err)
-			break
+			return nil, err
 		}
 		switch b {
 		case HexUnknownMaybeIndex:
@@ -76,20 +97,20 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 			if err != nil {
 				return nil, err
 			}
-			fmt.Print("Section: ")
-			fmt.Println(*sec)
+			// fmt.Print("Section: ")
+			// fmt.Println(*sec)
 			switch *sec {
 			case KWMakroCollectionItem:
-				lastItem = new(MakroCollectionItem)
-				result = append(result, lastItem)
+				lastItem = &MakroCollectionItem{}
+				result = append(result, *lastItem)
 			}
 		case HexString:
 			keyWord, err := ReadLenAndString(br)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Print("Key: ")
-			fmt.Println(*keyWord)
+			// fmt.Print("Key: ")
+			// fmt.Println(*keyWord)
 			lastValidKW := *keyWord
 			switch lastValidKW {
 			case KWMakroName:
@@ -97,8 +118,8 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 				if err != nil {
 					return nil, err
 				}
-				fmt.Printf("Value: %s\n", *value)
-				lastItem.Name = MakroName(*value)
+				// fmt.Printf("Value: %s\n", *value)
+				lastItem.Name = *value
 			case KWMakroCategory:
 				value, err := ReadKWAndLenAndString(br)
 				if err != nil {
@@ -110,7 +131,7 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 				if err != nil {
 					return nil, err
 				}
-				lastItem.FileName = MakroPath(*value)
+				lastItem.FileName = *value
 			case KWMakroForegroundColor:
 				color, err := ReadLenAndColor(br)
 				if err != nil {

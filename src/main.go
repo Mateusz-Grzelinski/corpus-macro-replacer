@@ -14,7 +14,7 @@ import (
 
 //go:generate fyne bundle -o src/bundled.go assets/
 
-const Version = "0.3"
+const Version = "0.4"
 
 func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
@@ -24,7 +24,8 @@ func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 		if exists {
 			log.Printf("Warning: Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
 		}
-		makro, err := LoadMakroFromCMKFile(makroFile)
+		// todo this call requires new flags to work properly
+		makro, err := LoadMakroFromCMKFile(makroFile, nil, nil)
 		if err != nil {
 			return nil, err
 		}

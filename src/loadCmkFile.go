@@ -55,17 +55,27 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 	default:
 		log.Printf("ERROR: unknown section name: '%s', sectionText: %s\n", currentSection, currentSectionText)
 	}
-
 }
+
+// key: makro name
+// value: path to file
+type MakroMappings map[string]string
 
 const M1InitialMacroMarker string = ""
 
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
-func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
+// use MakroMappings to resolve names in [MAKRO] section
+// makroRootPath + "<makro name>" is used as fallback path. When nil makroFile base path is treated as MakroRootPath, what might be false!
+// usually makroRootPath="C:\Tri D Corpus\Corpus 5.0\Makro\"
+func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping MakroMappings) (*M1, error) {
 	if makroFile == "" {
 		return nil, fmt.Errorf("missing input makro file")
+	}
+	if makroRootPath == nil {
+		tmp := filepath.Dir(makroFile)
+		makroRootPath = &tmp
 	}
 	makroFile, _ = filepath.Abs(makroFile)
 	initialMakro, err := partialLoadMakroFromCMKFile(makroFile)
@@ -93,7 +103,7 @@ func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
 			break
 		}
 
-		submacroName := filepath.Join(filepath.Dir(makroFile), macroToProcess+".CMK")
+		submacroName := filepath.Join(*makroRootPath, macroToProcess+".CMK")
 		macro, err := partialLoadMakroFromCMKFile(submacroName)
 		if err != nil {
 			return nil, err
@@ -130,7 +140,7 @@ func LoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	for _, macro := range resolveSubMakros {
 		for _, submacro := range macro.Makro {
 			if submacro.MAK == nil && submacro.EmbeddedMakroName != "" {
-				return nil, fmt.Errorf("ERROR: Makro '%s' not loaded properly! This might be a bug.", submacro.EmbeddedMakroName)
+				return nil, fmt.Errorf("ERROR: Makro '%s' not loaded properly! This might be a bug", submacro.EmbeddedMakroName)
 			}
 		}
 	}

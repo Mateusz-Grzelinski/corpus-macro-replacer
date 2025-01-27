@@ -25,7 +25,6 @@ import (
 const (
 	CorpusMacroReplacerDefaultPath = `C:\Tri D Corpus\CorpusMacroReplacer\`
 	CorpusFileBrowserDefaultPath   = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
-	MacrosDefaultPathNormal        = `C:\Tri D Corpus\Corpus 5.0\Makro\`
 	MacrosDefaultPath              = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
 )
 
@@ -45,10 +44,12 @@ var loadedS3DFileForPreview *ProjectFile
 var loadedE3DFileForPreview *ElementFile
 var loadedFileForPreviewError error
 var SelectedPath string
+var MakroCollectionCache MakroCollection = MakroCollection{}
 var corpusPreviewContainer *ElementFileContainer
 var ListOfLoadedFilesContainer *fyne.Container
 var MacrosToChangeEntries []*widget.Entry
-var addMakroButton *widget.Button
+var MacrosToChangeNamesEntries []*widget.Entry
+var AddMakroButton *widget.Button
 var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
 var refreshCorpusPreviewFunc func()
@@ -237,55 +238,69 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	return CorpusFileTreeContainer
 }
 
-func getMacroName(path string) string {
-	base, found := strings.CutSuffix(path, ".CMK") // todo sla
+func getMacroName(a fyne.App, path string) string {
+	makroSearchPath := a.Preferences().String("makroSearchPath")
+	if out := MakroCollectionCache.GetMacroNameByFileName(path); out != nil {
+		return *out
+	}
+	relPath, err := filepath.Rel(makroSearchPath, path)
+	if err != nil {
+		path = relPath
+	}
+	base, found := strings.CutSuffix(path, ".CMK")
 	if found {
 		return filepath.Base(base)
 	}
 	return filepath.Base(path)
 }
 
-func RemoveFromSlice(rem *widget.Entry) {
-	c := MacrosToChangeEntries
-	for i, o := range c {
-		if o != rem {
+func RemoveEntry(slice []*widget.Entry, item *widget.Entry) []*widget.Entry {
+	for i, o := range slice {
+		if o != item {
 			continue
 		}
 
-		removed := make([]*widget.Entry, len(c)-1)
-		copy(removed, c[:i])
-		copy(removed[i:], c[i+1:])
+		removed := make([]*widget.Entry, len(slice)-1)
+		copy(removed, slice[:i])
+		copy(removed[i:], slice[i+1:])
 
-		MacrosToChangeEntries = removed
-		return
+		return removed
 	}
+	return slice
 }
 
-func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
+func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 	macrosToChangeContainer := container.NewVBox()
 
-	addMakroButton = widget.NewButton("Dodaj makro do zamiany", func() {
-		newMacroInput := widget.NewEntry()
-		newEntryLabel := widget.NewLabelWithStyle("Nic nie wybrano", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-		// newEntryLabel.Truncation = fyne.TextTruncateEllipsis
-		newEntryLabel.Wrapping = fyne.TextWrapBreak
-		newMacroInput.SetPlaceHolder(`C:\Tri D Corpus\Corpus 5.0\Makro\*.CMK`)
-		newMacroInput.OnChanged = func(path string) {
+	AddMakroButton = widget.NewButton("Dodaj makro do zamiany", func() {
+		newMacroNameEntry := widget.NewEntry()
+		newMacroNameEntry.PlaceHolder = "Nazwa makra: Nawierty_uniwersalne_28mm"
+		makroErrorLabel := widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		makroErrorLabel.Hide()
+		makroErrorLabel.Wrapping = fyne.TextWrapBreak
+		newMacroPathEntry := widget.NewEntry()
+		newMacroPathEntry.SetPlaceHolder(`C:\Tri D Corpus\Corpus 5.0\Makro\*.CMK`)
+		newMacroPathEntry.OnChanged = func(path string) {
 			// wasteful but the best error reporting
-			_, err := LoadMakroFromCMKFile(path)
+			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
+			_, err := LoadMakroFromCMKFile(path, &makroRootPath, nil)
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
-				newEntryLabel.SetText(fmt.Sprintf("ERROR: %s", err))
-				newEntryLabel.Importance = widget.DangerImportance
+				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))
+				makroErrorLabel.Importance = widget.DangerImportance
+				makroErrorLabel.Show()
 			} else {
-				newEntryLabel.SetText(path)
-				newEntryLabel.Importance = widget.MediumImportance
+				newMacroNameEntry.SetText(getMacroName(a, path))
+				makroErrorLabel.Importance = widget.MediumImportance
+				makroErrorLabel.Hide()
+				refreshCorpusPreviewFunc()
 			}
-			newEntryLabel.Refresh()
+			makroErrorLabel.Refresh()
 		}
-		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroInput) // Add to the list
+		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroPathEntry)           // save to global var
+		MacrosToChangeNamesEntries = append(MacrosToChangeNamesEntries, newMacroNameEntry) // save global var
 		var row *fyne.Container
-		row = container.NewBorder(newEntryLabel, nil, nil,
+		row = container.NewBorder(newMacroNameEntry, container.NewVBox(makroErrorLabel, widget.NewSeparator()), nil,
 			container.NewHBox(
 				widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
 					fileOpenDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
@@ -294,8 +309,8 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 							return
 						}
 						path := reader.URI().Path()
-						newMacroInput.SetText(path)
-						newEntryLabel.SetText(getMacroName(path))
+						newMacroPathEntry.SetText(path)
+						newMacroNameEntry.SetText(getMacroName(a, path))
 						row.Refresh()
 					}, *myWindow)
 
@@ -312,21 +327,22 @@ func getRightPanel(myWindow *fyne.Window) *widget.Accordion {
 				}),
 				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 					macrosToChangeContainer.Remove(row)
-					RemoveFromSlice(newMacroInput)
+					MacrosToChangeNamesEntries = RemoveEntry(MacrosToChangeNamesEntries, newMacroNameEntry)
+					MacrosToChangeEntries = RemoveEntry(MacrosToChangeEntries, newMacroPathEntry)
 					macrosToChangeContainer.Refresh()
 					refreshCorpusPreviewFunc()
 				}),
 			),
-			newMacroInput,
+			newMacroPathEntry,
 		)
 		macrosToChangeContainer.Add(row)
 	})
-	addMakroButton.OnTapped()
+	AddMakroButton.OnTapped()
 
 	item1 := widget.NewAccordionItem("Makra do zamiany",
 		container.NewScroll(
 			container.NewVBox(
-				addMakroButton,
+				AddMakroButton,
 				macrosToChangeContainer,
 			),
 		),
@@ -359,8 +375,8 @@ func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel
 		} else if stat.IsDir() {
 			l := widget.NewLabel(fmt.Sprintf("Wybrano katlog '%s'", SelectedPath))
 			l.Wrapping = fyne.TextWrapWord
-			l2 := widget.NewLabel("Kliknij Dodaj aby wybrać wszystkie pliki w katalogu")
-			l3 := widget.NewLabel("Kliknij w plik aby otworzyć podgląd")
+			l2 := widget.NewLabel(`Kliknij "+Wczytaj plik/katalog" aby wybrać WSZYTKIE pliki w katalogu`)
+			l3 := widget.NewLabel("Kliknij plik aby otworzyć podgląd")
 			vBox.Add(l)
 			vBox.Add(l2)
 			vBox.Add(l3)
@@ -491,7 +507,6 @@ func RunGui() {
 	myWindow := a.NewWindow("Corpus Makro Replacer")
 	myWindow.SetIcon(resourceCorpusreplacerlogoPng)
 	customTheme := NewCustomTheme(theme.DefaultTheme())
-	///resourceFilterSvg
 	a.Settings().SetTheme(customTheme)
 
 	centerContainer := getCenterPanel(a, myWindow)
@@ -503,7 +518,43 @@ func RunGui() {
 
 	openSettings := func() {
 		w := a.NewWindow("Ustawienia")
-		w.SetContent(settings.NewSettings().LoadAppearanceScreen(w))
+		settingsContent := settings.NewSettings().LoadAppearanceScreen(w)
+
+		labelSearch := widget.NewLabel("Domyślna ścieżka szukania Makr")
+		makroSearchPath := a.Preferences().StringWithFallback("makroSearchPath", `C:\Tri D Corpus\Corpus 5.0\Makro\`)
+		makroSearchEntry := widget.NewEntry()
+		makroSearchEntry.SetText(makroSearchPath)
+		makroSearchEntry.OnChanged = func(inputPath string) {
+			a.Preferences().SetString("makroSearchPath", inputPath)
+		}
+		label := widget.NewLabel("Opcjonalna ścieżka do MakroCollection.Dat. Ten plik dostarcza mapowanie nazwa makra w Corpus <-> ścieżka pliku. Domyślnie nazwa makra to nazwa pliku. ")
+		label.Wrapping = fyne.TextWrapBreak
+		errLabel := widget.NewLabel("")
+		errLabel.Wrapping = fyne.TextWrapBreak
+		makroCollectionPath := a.Preferences().StringWithFallback("makroCollectionPath", `C:\Tri D Corpus\Corpus 5.0\Makro\MakroCollection.dat`)
+		makroCollectionEntry := widget.NewEntry()
+		makroCollectionEntry.SetText(makroCollectionPath)
+		makroCollectionEntry.OnChanged = func(inputPath string) {
+			collection, err := LoadMakroCollection(inputPath)
+			MakroCollectionCache = collection
+			errLabel.Show()
+			if err != nil {
+				errLabel.SetText(fmt.Sprintf("error: %s", err))
+				errLabel.Importance = widget.DangerImportance
+				errLabel.Refresh()
+				return
+			} else {
+				errLabel.SetText(fmt.Sprintf("MakroCollection.Dat: załadowano %d mapowań", len(collection)))
+				errLabel.Importance = widget.MediumImportance
+				errLabel.Refresh()
+				a.Preferences().SetString("makroCollection", inputPath)
+			}
+		}
+		makroCollectionEntry.OnChanged(makroCollectionPath) // run to report any errors
+		makroSettings := widget.NewCard("Ustawienia makr", "", container.NewVBox(labelSearch, makroSearchEntry, label, makroCollectionEntry, errLabel))
+		w.SetContent(
+			container.NewVBox(makroSettings, settingsContent),
+		)
 		w.Resize(fyne.NewSize(440, 520))
 		w.SetIcon(resourceCorpusreplacerlogoPng)
 		w.Show()
@@ -514,7 +565,7 @@ func RunGui() {
 		w.SetContent(container.NewVBox(
 			widget.NewLabel(fmt.Sprintf("Version: %s", Version)),
 			widget.NewLabel("Author: Mateusz Grzeliński"),
-			widget.NewHyperlink("Source & documentation", parseURL("https://github.com/Mateusz-Grzelinski/corpus-macro-replacer.git")),
+			widget.NewHyperlink("Source - documentation - license", parseURL("https://github.com/Mateusz-Grzelinski/corpus-macro-replacer.git")),
 		))
 		w.Show()
 	}
@@ -529,7 +580,11 @@ func RunGui() {
 		outputButton,
 	)
 	left := getLeftPanel(a, &myWindow)
-	right := getRightPanel(&myWindow)
+	right := getRightPanel(a, &myWindow)
+
+	// collection, _ := LoadMakroCollection(inputPath)
+	// MakroCollectionCache = &collection
+
 	hSplit := container.NewHSplit(left, centerContainer)
 	hSplit.SetOffset(0.2)
 	center := container.NewHSplit(hSplit, right)

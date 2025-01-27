@@ -91,25 +91,30 @@ func NewMacroContainer(nestLevel int, parentPlate *PlateContainer) *MacroContain
 		if mc.oldMakro == nil {
 			return
 		}
-		macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, mc.oldMakro.MakroName) + ".CMK"
+		MacrosDefaultPathNormal := fyne.CurrentApp().Preferences().String("makroSearchPath")
+		oldMakroNameWithExtension := mc.oldMakro.MakroName + ".CMK"
+		macroFileName := cmp.Or(MakroCollectionCache.GetMacroFileNameByName(mc.oldMakro.MakroName), &oldMakroNameWithExtension)
+		macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, *macroFileName)
 		addToLoadedFilesAndRefresh(SelectedPath)
-		for _, makroTochangeName := range MacrosToChangeEntries {
-			if makroTochangeName.Text == macroGuessedPath {
+		for _, makroTochangeName := range MacrosToChangeNamesEntries {
+			if makroTochangeName.Text == mc.oldMakro.MakroName {
 				return
 			}
 		}
 		needCreation := true
-		for _, makroTochangeName := range MacrosToChangeEntries {
-			if makroTochangeName.Text == "" {
-				makroTochangeName.SetText(macroGuessedPath)
+		for i, makroToChangeEntry := range MacrosToChangeEntries {
+			if makroToChangeEntry.Text == "" {
+				makroToChangeEntry.SetText(macroGuessedPath)
+				MacrosToChangeNamesEntries[i].SetText(mc.oldMakro.MakroName)
 				needCreation = false
 				break
 			}
 		}
 		if needCreation {
-			addMakroButton.OnTapped()
+			AddMakroButton.OnTapped()
+			MacrosToChangeEntries[len(MacrosToChangeEntries)-1].SetText(macroGuessedPath)
+			MacrosToChangeNamesEntries[len(MacrosToChangeNamesEntries)-1].SetText(mc.oldMakro.MakroName)
 		}
-		MacrosToChangeEntries[len(MacrosToChangeEntries)-1].SetText(macroGuessedPath)
 		contentRead.Refresh()
 		refreshCorpusPreviewFunc()
 	},
@@ -185,7 +190,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	mc.contentRead.Hide()
 
 	if compact {
-		mc.openButton.SetText(mc.parentPlate.openButton.Text + cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+		mc.openButton.SetText(mc.parentPlate.openButton.Text + "/" + cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
 	} else {
 		mc.openButton.SetText(cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
 	}
@@ -295,10 +300,10 @@ func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 	mc.oldMakro = oldMakro
 	mc.newMakro = nil
 	var newMakro *M1
-	for _, makroToChangeName := range MacrosToChangeEntries {
-		newMakroName := getMacroName(makroToChangeName.Text)
-		if oldMakro.MakroName == newMakroName {
-			makro, err := LoadMakroFromCMKFile(makroToChangeName.Text)
+	for i, makroToChangeName := range MacrosToChangeNamesEntries {
+		if oldMakro.MakroName == makroToChangeName.Text {
+			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
+			makro, err := LoadMakroFromCMKFile(MacrosToChangeEntries[i].Text, &makroRootPath, nil)
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 			}
@@ -412,27 +417,3 @@ func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 func (mc *MacroContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(mc.all)
 }
-
-// func (cm *MacroContainer) Refresh() {
-// 	con := cm
-// 	oldMakro := cm.oldMakro
-// 	con.Update(oldMakro)
-
-// 	// todo very slow
-// 	var newMakro *M1
-// 	for _, makroTochangeName := range MacrosToChangeEntries {
-// 		newMakroName := getMacroName(makroTochangeName.Text)
-// 		if oldMakro.MakroName == newMakroName {
-// 			makro, err := LoadMakroFromCMKFile(makroTochangeName.Text)
-// 			newMakro = makro
-// 			if err != nil {
-// 				log.Println(err)
-// 			}
-// 			break
-// 		}
-// 	}
-// 	con.UpdateMacroForDiff(newMakro)
-// 	con.contentHeader.Refresh()
-// 	con.contentRead.Refresh()
-// 	con.contentDiff.Refresh()
-// }
