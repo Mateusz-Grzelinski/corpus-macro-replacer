@@ -283,7 +283,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 		newMacroPathEntry.OnChanged = func(path string) {
 			// wasteful but the best error reporting
 			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
-			_, err := LoadMakroFromCMKFile(path, &makroRootPath, nil)
+			_, err := LoadMakroFromCMKFile(path, &makroRootPath, MakroCollectionCache.GetMacroMappings())
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))

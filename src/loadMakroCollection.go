@@ -37,6 +37,13 @@ func (mc *MakroCollection) GetMacroFileNameByName(name string) *string {
 	}
 	return nil
 }
+func (mc *MakroCollection) GetMacroMappings() MakroMappings {
+	out := MakroMappings{}
+	for _, mcc := range *mc {
+		out[mcc.Name] = mcc.FileName
+	}
+	return out
+}
 
 type MakroCollectionItem struct {
 	FileName    string

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"fmt"
 	"log"
 	"os"
@@ -67,7 +68,7 @@ const M1InitialMacroMarker string = ""
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
 // use MakroMappings to resolve names in [MAKRO] section
-// makroRootPath + "<makro name>" is used as fallback path. When nil makroFile base path is treated as MakroRootPath, what might be false!
+// makroRootPath + "<makro name>" is used as fallback path when makro name is not in makroMapping. When nil makroFile base path is treated as MakroRootPath, what might be false!
 // usually makroRootPath="C:\Tri D Corpus\Corpus 5.0\Makro\"
 func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping MakroMappings) (*M1, error) {
 	if makroFile == "" {
@@ -103,7 +104,8 @@ func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping 
 			break
 		}
 
-		submacroName := filepath.Join(*makroRootPath, macroToProcess+".CMK")
+		submacroPath := makroMapping[macroToProcess]
+		submacroName := filepath.Join(*makroRootPath, cmp.Or(submacroPath, macroToProcess+".CMK"))
 		macro, err := partialLoadMakroFromCMKFile(submacroName)
 		if err != nil {
 			return nil, err
