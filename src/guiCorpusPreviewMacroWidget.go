@@ -303,7 +303,7 @@ func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 	for i, makroToChangeName := range MacrosToChangeNamesEntries {
 		if oldMakro.MakroName == makroToChangeName.Text {
 			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
-			makro, err := LoadMakroFromCMKFile(MacrosToChangeEntries[i].Text, &makroRootPath, MakroCollectionCache.GetMacroMappings())
+			makro, err := LoadMakroFromCMKFile(MacrosToChangeEntries[i].Text, &makroRootPath, MakroCollectionCache.GetMakroMappings())
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 			}

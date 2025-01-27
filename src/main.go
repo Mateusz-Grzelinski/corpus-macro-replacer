@@ -16,7 +16,7 @@ import (
 
 const Version = "0.4"
 
-func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
+func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping MakroMappings) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
 	for _, makroFile := range makroFiles {
 		absPathMakroFile := strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
@@ -25,7 +25,7 @@ func ReadMakrosFromCMK(makroFiles []string) (map[string]*M1, error) {
 			log.Printf("Warning: Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
 		}
 		// todo this call requires new flags to work properly
-		makro, err := LoadMakroFromCMKFile(makroFile, nil, nil)
+		makro, err := LoadMakroFromCMKFile(makroFile, makroRootPath, makroMapping)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +160,7 @@ func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFi
 
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
-	makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error reading CMK macros: %w", err)
 	}
@@ -261,7 +261,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 			log.Fatalf("output %s already exists. Add --force to override", *output)
 		}
 
-		makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+		makrosToReplace, err := ReadMakrosFromCMK(makroFiles, nil, nil)
 		log.Fatalf("can not read makros: %s", err)
 		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace, *alwaysConvertLocalToGlobal, *verbose, *minify)
 	}

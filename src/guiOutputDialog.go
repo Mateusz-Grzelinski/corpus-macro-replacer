@@ -64,7 +64,7 @@ func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[st
 	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, alwaysConvertLocalToGlobal, verbose, minify)
 }
 
-func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) {
+func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping MakroMappings) {
 	log.Printf("Generating output to: %s", outputDir)
 	// originalStderr := os.Stderr
 	// // Create a pipe to capture stderr
@@ -77,7 +77,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 	// todo make panic handler to write to stderr
 
 	// var buf bytes.Buffer
-	makrosToReplace, err := ReadMakrosFromCMK(makroFiles)
+	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, makroRootPath, makroMapping)
 	currentLog, _ := logData.Get()
 	if err != nil {
 		log.Println(err)
@@ -203,9 +203,10 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 								macrosTochange = append(macrosTochange, e.Text)
 							}
 							alwaysConvertLocalToGlobal := a.Preferences().Bool("alwaysConvertLocalToGlobal")
-							verbose := a.Preferences().Bool("minify")
-							minify := a.Preferences().Bool("verbose")
-							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, alwaysConvertLocalToGlobal, verbose, minify)
+							verbose := a.Preferences().Bool("verbose")
+							minify := a.Preferences().Bool("minify")
+							makroRootPath := a.Preferences().String("makroSearchPath")
+							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, MakroCollectionCache.GetMakroMappings())
 							logWindow.Refresh()
 						}),
 						widget.NewButtonWithIcon("", theme.MoreVerticalIcon(), func() {
