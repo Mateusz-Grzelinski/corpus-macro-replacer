@@ -1,5 +1,13 @@
 package main
 
+import (
+	"fmt"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
+)
+
 type ConvertLocalVariablesToGlobal string
 
 const (
@@ -38,3 +46,39 @@ const (
 	*/
 	// KeepLocalIfHasCondition
 )
+
+func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
+	labelSearch := widget.NewLabel("Domyślna ścieżka szukania Makr")
+	makroSearchPath := a.Preferences().StringWithFallback("makroSearchPath", `C:\Tri D Corpus\Corpus 5.0\Makro\`)
+	makroSearchEntry := widget.NewEntry()
+	makroSearchEntry.SetText(makroSearchPath)
+	makroSearchEntry.OnChanged = func(inputPath string) {
+		a.Preferences().SetString("makroSearchPath", inputPath)
+	}
+	label := widget.NewLabel("Opcjonalna ścieżka do MakroCollection.Dat. Ten plik dostarcza mapowanie nazwa makra w Corpus <-> ścieżka pliku. Domyślnie nazwa makra to nazwa pliku. ")
+	label.Wrapping = fyne.TextWrapBreak
+	errLabel := widget.NewLabel("")
+	errLabel.Wrapping = fyne.TextWrapBreak
+	makroCollectionPath := a.Preferences().StringWithFallback("makroCollectionPath", `C:\Tri D Corpus\Corpus 5.0\Makro\MakroCollection.dat`)
+	makroCollectionEntry := widget.NewEntry()
+	makroCollectionEntry.SetText(makroCollectionPath)
+	makroCollectionEntry.OnChanged = func(inputPath string) {
+		collection, err := LoadMakroCollection(inputPath)
+		MakroCollectionCache = collection
+		errLabel.Show()
+		if err != nil {
+			errLabel.SetText(fmt.Sprintf("error: %s", err))
+			errLabel.Importance = widget.DangerImportance
+			errLabel.Refresh()
+			return
+		} else {
+			errLabel.SetText(fmt.Sprintf("MakroCollection.Dat: załadowano %d mapowań", len(collection)))
+			errLabel.Importance = widget.MediumImportance
+			errLabel.Refresh()
+			a.Preferences().SetString("makroCollection", inputPath)
+		}
+	}
+	makroCollectionEntry.OnChanged(makroCollectionPath) // run to report any errors
+	return widget.NewCard("Ustawienia makr", "", container.NewVBox(labelSearch, makroSearchEntry, label, makroCollectionEntry, errLabel))
+
+}
