@@ -75,16 +75,18 @@ type Spoj struct {
 	Makro2 GenericNode `xml:"M2"`
 }
 
-type GenericAttribute struct { // Varijable
-	DAT  string `xml:"DAT,attr"`
-	Attr string `xml:",any,attr"`
+type GenericNodeWithDat struct { // Varijable
+	GenericNode
+	DAT string `xml:"DAT,attr"`
+	// Attr string `xml:",any,attr"`
 }
 
 type EmbeddedMakro struct {
-	GenericNode
+	// GenericNode
+	GenericNodeWithDat
 	EmbeddedMakroName string `xml:"-"`
-	DAT               string `xml:"DAT,attr"`
-	MAK               *M1    `xml:"MAK,omitempty"`
+	// DAT               string `xml:"DAT,attr"`
+	MAK *M1 `xml:"MAK,omitempty"`
 }
 
 /*
@@ -107,16 +109,16 @@ Example value:
 type M1 struct {
 	GenericNode
 	/* MN is not obligatory. Empty names means that makro is not save in any file. */
-	MakroName string             `xml:"MN,attr"`
-	Varijable GenericAttribute   `xml:"MSVA"`
-	Formule   *GenericAttribute  `xml:"MSFO,omitempty"`
-	Pila      []GenericAttribute `xml:"MSPI,omitempty"`
-	Joint     *GenericAttribute  `xml:"MSJO,omitempty"`
-	Grupa     []GenericAttribute `xml:"MSGR,omitempty"`
-	Potrosni  []GenericAttribute `xml:"MSPO,omitempty"`
-	Pocket    []GenericAttribute `xml:"MSPOCK,omitempty"`
-	Raster    []GenericAttribute `xml:"MSRA,omitempty"`
-	Makro     []EmbeddedMakro    `xml:"MSMA,omitempty"`
+	MakroName string               `xml:"MN,attr"`
+	Varijable GenericNodeWithDat   `xml:"MSVA"`
+	Formule   *GenericNodeWithDat  `xml:"MSFO,omitempty"`
+	Pila      []GenericNodeWithDat `xml:"MSPI,omitempty"`
+	Joint     *GenericNodeWithDat  `xml:"MSJO,omitempty"`
+	Grupa     []GenericNodeWithDat `xml:"MSGR,omitempty"`
+	Potrosni  []GenericNodeWithDat `xml:"MSPO,omitempty"`
+	Pocket    []GenericNodeWithDat `xml:"MSPOCK,omitempty"`
+	Raster    []GenericNodeWithDat `xml:"MSRA,omitempty"`
+	Makro     []EmbeddedMakro      `xml:"MSMA,omitempty"`
 }
 
 type TrimmerDecoder struct {

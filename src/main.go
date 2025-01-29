@@ -160,6 +160,7 @@ func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFi
 
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
+	// todo support the rest of parameters
 	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error reading CMK macros: %w", err)

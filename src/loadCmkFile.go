@@ -23,25 +23,25 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 	switch strings.ToLower(currentSection) {
 	case "":
 	case "raster":
-		m.Raster = append(m.Raster, GenericAttribute{DAT: currentSectionText})
+		m.Raster = append(m.Raster, GenericNodeWithDat{DAT: currentSectionText})
 	case "varijable":
 		m.Varijable.DAT = currentSectionText
 	case "formule":
-		m.Formule = new(GenericAttribute)
+		m.Formule = new(GenericNodeWithDat)
 		m.Formule.DAT = currentSectionText
 	case "joint":
-		m.Joint = new(GenericAttribute)
+		m.Joint = new(GenericNodeWithDat)
 		m.Joint.DAT = currentSectionText
 	case "grupa":
-		m.Grupa = append(m.Grupa, GenericAttribute{DAT: currentSectionText})
+		m.Grupa = append(m.Grupa, GenericNodeWithDat{DAT: currentSectionText})
 	case "potrosni":
-		m.Potrosni = append(m.Potrosni, GenericAttribute{DAT: currentSectionText})
+		m.Potrosni = append(m.Potrosni, GenericNodeWithDat{DAT: currentSectionText})
 	case "pocket":
-		m.Pocket = append(m.Pocket, GenericAttribute{DAT: currentSectionText})
+		m.Pocket = append(m.Pocket, GenericNodeWithDat{DAT: currentSectionText})
 	case "pila":
-		m.Pila = append(m.Pila, GenericAttribute{DAT: currentSectionText})
+		m.Pila = append(m.Pila, GenericNodeWithDat{DAT: currentSectionText})
 	case "makro":
-		embeddedMakro := EmbeddedMakro{DAT: currentSectionText, MAK: nil}
+		embeddedMakro := EmbeddedMakro{GenericNodeWithDat: GenericNodeWithDat{DAT: currentSectionText}, MAK: nil}
 		for _, line := range strings.Split(currentSectionText, CMKLineSeparator) { // todo iterate
 			line = decodeCMKLine(line)
 			nameAndValue := strings.SplitN(line, "=", 2)
