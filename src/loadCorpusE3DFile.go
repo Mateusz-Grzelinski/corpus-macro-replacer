@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 )
 
 type GenericNode struct {
@@ -123,6 +125,90 @@ type M1 struct {
 
 type TrimmerDecoder struct {
 	decoder *xml.Decoder
+}
+
+// save makro as CMK file
+func (m *M1) Save(w io.Writer) error {
+	if _, err := w.Write([]byte("[VARIJABLE]\n")); err != nil {
+		return err
+	}
+	{
+		text := strings.Join(decodeAllCMKLines(m.Varijable.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	if m.Joint != nil {
+		if _, err := w.Write([]byte("\n[JOINT]\n")); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(m.Joint.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	if m.Formule != nil {
+		if _, err := w.Write([]byte("\n[FORMULE]\n")); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(m.Formule.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+
+	for i, item := range m.Pocket {
+		section := fmt.Sprintf("\n[POCKET%d]\n", i)
+		if _, err := w.Write([]byte(section)); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	for i, item := range m.Potrosni {
+		section := fmt.Sprintf("\n[POTROSNI%d]\n", i)
+		if _, err := w.Write([]byte(section)); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	for i, item := range m.Grupa {
+		section := fmt.Sprintf("\n[GRUPA%d]\n", i)
+		if _, err := w.Write([]byte(section)); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	for i, item := range m.Raster {
+		section := fmt.Sprintf("\n[RASTER%d]\n", i)
+		if _, err := w.Write([]byte(section)); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+	for i, item := range m.Makro {
+		section := fmt.Sprintf("\n[MAKRO%d]\n", i)
+		if _, err := w.Write([]byte(section)); err != nil {
+			return err
+		}
+		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		if _, err := w.Write([]byte(text)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (tr TrimmerDecoder) Token() (xml.Token, error) {

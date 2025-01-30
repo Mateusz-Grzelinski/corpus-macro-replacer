@@ -1,13 +1,17 @@
 package main
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -238,7 +242,7 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	return CorpusFileTreeContainer
 }
 
-func getMacroName(a fyne.App, path string) string {
+func getMacroNameByFileName(a fyne.App, path string) string {
 	makroSearchPath := a.Preferences().String("makroSearchPath")
 	if out := MakroCollectionCache.GetMacroNameByFileName(path); out != nil {
 		return *out
@@ -275,6 +279,8 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 	AddMakroButton = widget.NewButton("Dodaj makro do zamiany", func() {
 		newMacroNameEntry := widget.NewEntry()
 		newMacroNameEntry.PlaceHolder = "Nazwa makra: Nawierty_uniwersalne_28mm"
+		autoFixError := widget.NewButton("AutoFix", nil)
+		autoFixError.Hide()
 		makroErrorLabel := widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		makroErrorLabel.Hide()
 		makroErrorLabel.Wrapping = fyne.TextWrapBreak
@@ -287,10 +293,111 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))
+				var targetErr *fs.PathError
+				if errors.As(err, &targetErr) {
+					if targetErr.Op == "open" && errors.Is(targetErr.Err, syscall.ERROR_FILE_NOT_FOUND) {
+						autoFixError.Show()
+						autoFixError.OnTapped = func() {
+							card1Result := widget.NewLabel("")
+							card1Result.Wrapping = fyne.TextWrapBreak
+							card1Result.Importance = widget.DangerImportance
+							makroSearchPath := a.Preferences().String("makroSearchPath")
+							card1 := widget.NewCard("1. Szukam brakującego pliku w Makrach", "Szukam w "+makroSearchPath, container.NewVBox(card1Result))
+							card2Result := widget.NewLabel("")
+							card2Result.Wrapping = fyne.TextWrapBreak
+							card2Result.Importance = widget.DangerImportance
+							card2 := widget.NewCard("2. Odtwarzam brakujące makro z pliku Corpusa", "Szukam w "+cmp.Or(SelectedPath, ""), container.NewVBox(card2Result))
+							card2.Hide()
+							cardFail := widget.NewCard("Nie udało się naprawić", "", container.NewVBox(
+								widget.NewRichTextFromMarkdown(`
+- zaznacz inny plik Corpusa uruchom AutoFix jeszcze raz
+- autor mógł zmienić nazwę pliku CMK (duże i małe litery mają znaczenie)
+- autor mógł zmienić nazwę makra w pliku MakroCollection.dat (do edycji z poziomy corpusa)
+- plik może już nie istnieć
+- edycja nazwy makra nie jest jeszcze wspierana`),
+							))
+							cardFail.Hide()
+							cardOk := widget.NewCard("Udało się naprawić", "", container.NewVBox(
+								widget.NewRichTextFromMarkdown("Makro może mieć niepożadaną zawartość, polezam na nie spojrzeć"),
+								widget.NewRichTextFromMarkdown("Jeszcze inne błędy mogą wystąpić, klikaj AutoFix do skutku"),
+							))
+							cardOk.Hide()
+							filterDialog := dialog.NewCustom("Szukam brakującego makra", "Zamknij", container.NewVBox(card1, card2, cardFail, cardOk), *myWindow)
+							continueRecovery := true
+							baseFilename := filepath.Base(targetErr.Path)
+							if continueRecovery {
+								foundFile, _ := findFile(makroSearchPath, baseFilename)
+								if foundFile != "" {
+									err := copyFile(foundFile, targetErr.Path)
+									if err != nil {
+										card1Result.SetText(fmt.Sprintf("Znaleziono: \"%s\" i ale nie udało się skopiować do \"%s\": %s", foundFile, targetErr.Path, err))
+									} else {
+										card1Result.SetText(fmt.Sprintf("Znaleziono: \"%s\" i skopiowano do \"%s\"", foundFile, targetErr.Path))
+										card1Result.Importance = widget.HighImportance
+									}
+									continueRecovery = false
+								} else {
+									card1Result.SetText(fmt.Sprintf("Nie znaleziono: \"%s\" w \"%s\"", baseFilename, makroSearchPath))
+								}
+							}
+
+							if continueRecovery {
+								var makros *ElementFile
+								if loadedE3DFileForPreview != nil {
+									makros = loadedE3DFileForPreview
+								} else if loadedS3DFileForPreview != nil {
+									makros = &loadedS3DFileForPreview.ElementFile
+								}
+								if makros != nil {
+									makroNameToFind := getMacroNameByFileName(a, targetErr.Path)
+								outterLoop:
+									for _, e := range makros.Element {
+										for _, s := range e.Elinks.Spoj {
+											if s.Makro1.MakroName != makroNameToFind {
+												continue
+											}
+											f, err := os.Create(targetErr.Path)
+											if err != nil {
+												card2Result.SetText(fmt.Sprintf("otwarty plik Corpusa ma makro \"%s\", ale nie można go zapisać: %s", baseFilename, err))
+											} else {
+												_, err1 := f.Write([]byte(fmt.Sprintf("// odzyskano z %s\n", SelectedPath)))
+												err := s.Makro1.Save(f)
+												if err1 != nil && err != nil {
+													card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa, ale wystąpił błąd przy zapisywaniu: %s", baseFilename, err))
+												} else {
+													card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa i zapisano: %s. Zawartość pliku może być stara.", baseFilename, targetErr.Path))
+													card2Result.Importance = widget.HighImportance
+													continueRecovery = false
+												}
+											}
+											break outterLoop
+										}
+									}
+									if continueRecovery {
+										card2Result.SetText(fmt.Sprintf("nie znaleziono Makra \"%s\" w otwartym pliku Corpusa", baseFilename))
+									}
+								} else {
+									card2Result.SetText(fmt.Sprintf("otwórz plik corpusa aby poszukać w nim Makra: \"%s\"", baseFilename))
+								}
+								card2.Show()
+							}
+							if continueRecovery {
+								cardFail.Show()
+							} else {
+								makroErrorLabel.Hide()
+								autoFixError.Hide()
+								cardOk.Show()
+							}
+
+							filterDialog.Resize(DialogSizeDefault)
+							filterDialog.Show()
+						}
+					}
+				}
 				makroErrorLabel.Importance = widget.DangerImportance
 				makroErrorLabel.Show()
 			} else {
-				newMacroNameEntry.SetText(getMacroName(a, path))
+				newMacroNameEntry.SetText(getMacroNameByFileName(a, path))
 				makroErrorLabel.Importance = widget.MediumImportance
 				makroErrorLabel.Hide()
 				refreshCorpusPreviewFunc()
@@ -300,7 +407,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroPathEntry)           // save to global var
 		MacrosToChangeNamesEntries = append(MacrosToChangeNamesEntries, newMacroNameEntry) // save global var
 		var row *fyne.Container
-		row = container.NewBorder(newMacroNameEntry, container.NewVBox(makroErrorLabel, widget.NewSeparator()), nil,
+		row = container.NewBorder(newMacroNameEntry, container.NewVBox(container.NewBorder(nil, nil, nil, autoFixError, makroErrorLabel), widget.NewSeparator()), nil,
 			container.NewHBox(
 				widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
 					fileOpenDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
@@ -308,9 +415,12 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 							dialog.ShowError(err, *myWindow)
 							return
 						}
+						if reader == nil {
+							return
+						}
 						path := reader.URI().Path()
 						newMacroPathEntry.SetText(path)
-						newMacroNameEntry.SetText(getMacroName(a, path))
+						newMacroNameEntry.SetText(getMacroNameByFileName(a, path))
 						row.Refresh()
 					}, *myWindow)
 

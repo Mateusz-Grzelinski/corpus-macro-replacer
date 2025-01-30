@@ -90,7 +90,7 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) []
 	log.Println("Updating [VARIJABLE]")
 	for _, newName := range newVariablesKeys {
 		oldName, _ := CMKFindName(oldVariablesKeys, newName)
-		newValue, _ := newValues[newName]
+		newValue := newValues[newName]
 		// setting: convert local values to global: always; if value stays the same; convert to evar expression; Keep as is
 		// todo if oldValue is not integer, do not allow to convert it to global value
 		// one=4
