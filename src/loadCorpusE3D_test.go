@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-var pathToTestData = filepath.Join("..", "tests", "testData", "E3D")
+var pathToE3DTestData = filepath.Join("..", "tests", "testData", "E3D")
 var testFilesE3D = []string{
 	"simple.E3D",
 	"simple_macro_in_macro.E3D",
@@ -15,23 +15,26 @@ var testFilesE3D = []string{
 	"simple_in_simple_in_simple.E3D",
 }
 
-func TestLoadMakroFromCMKFile(t *testing.T) {
-	for _, testFile := range testFilesMakroCollection {
-		simple_path := filepath.Join(pathToTestMakroCollection, testFile)
-		_, elementFile, err := NewCorpusFile(simple_path)
+func TestLoadCorpusE3DFile(t *testing.T) {
+	for _, testFile := range testFilesE3D {
+		simple_path := filepath.Join(pathToE3DTestData, testFile)
+		_, _, err := NewCorpusFile(simple_path)
 		if err != nil {
 			t.Error(err)
+			// t.Log(elementFile)
 		}
-		t.Log(elementFile)
 	}
 }
 
+// output E3D file in not exactly the same as input, but that is within xml spec
+// todo I want to manually check what is actually encoded
 func isSimilar(t *testing.T, originalPath string, encoded string) bool {
-
+	// panic("no implemented")
 	return true
 }
-func TestLoadMakroFromCMKFileSimpleInSimple(t *testing.T) {
-	simple_path := filepath.Join(pathToTestMakroCollection, "simple_in_simple.E3D")
+
+func TestLoadCorpusE3DFileSimpleInSimple(t *testing.T) {
+	simple_path := filepath.Join(pathToE3DTestData, "simple_in_simple.E3D")
 	_, elementFile, err := NewCorpusFile(simple_path)
 	if err != nil {
 		t.Error(err)

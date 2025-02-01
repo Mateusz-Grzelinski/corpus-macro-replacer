@@ -16,7 +16,7 @@ var testFilesMakroCollection = []string{
 
 func TestLoadMakroCollectionMinimal(t *testing.T) {
 	path := filepath.Join(pathToTestMakroCollection, testFilesMakroCollection[0])
-	out, err := LoadMakroCollection(path)
+	out, err := NewMakroCollection(path)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -49,14 +49,14 @@ func TestLoadMakroCollectionMinimal(t *testing.T) {
 }
 func TestLoadMakroCollection2Items(t *testing.T) {
 	path := filepath.Join(pathToTestMakroCollection, testFilesMakroCollection[1])
-	out, err := LoadMakroCollection(path)
+	out, err := NewMakroCollection(path)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 	if len(out) != 2 {
 		t.Log(out)
-		t.Error("wrong len")
+		t.Errorf("wrong len: %d", len(out))
 		t.FailNow()
 	}
 	item := out[0]
@@ -83,7 +83,7 @@ func TestLoadMakroCollection2Items(t *testing.T) {
 }
 func TestLoadMakroCollection2ItemsSameNameMissingFileds(t *testing.T) {
 	path := filepath.Join(pathToTestMakroCollection, testFilesMakroCollection[2])
-	out, err := LoadMakroCollection(path)
+	out, err := NewMakroCollection(path)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -117,7 +117,7 @@ func TestLoadMakroCollection2ItemsSameNameMissingFileds(t *testing.T) {
 }
 func TestLoadMakroCollectionCompleteExample(t *testing.T) {
 	path := filepath.Join(pathToTestMakroCollection, testFilesMakroCollection[3])
-	out, err := LoadMakroCollection(path)
+	out, err := NewMakroCollection(path)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()

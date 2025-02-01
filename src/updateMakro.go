@@ -79,10 +79,10 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) []
 	// combine old and new in "smart way"
 	var outputVarijable strings.Builder
 	// write initial comment
-	for _, line := range newVariablesComments[M1InitialMacroMarker] {
+	for _, line := range newVariablesComments[InitialMacroKey] {
 		outputVarijable.WriteString(encodeCMKLine(line))
 	}
-	delete(newVariablesComments, M1InitialMacroMarker) // not really necessary
+	delete(newVariablesComments, InitialMacroKey) // not really necessary
 
 	updateResultVarijable := []Change{}
 	// old=1 // deleted

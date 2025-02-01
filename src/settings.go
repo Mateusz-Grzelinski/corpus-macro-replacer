@@ -63,7 +63,7 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 	makroCollectionEntry := widget.NewEntry()
 	makroCollectionEntry.SetText(makroCollectionPath)
 	makroCollectionEntry.OnChanged = func(inputPath string) {
-		collection, err := LoadMakroCollection(inputPath)
+		collection, err := NewMakroCollection(inputPath)
 		MakroCollectionCache = collection
 		errLabel.Show()
 		if err != nil {
@@ -77,6 +77,7 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 			errLabel.Refresh()
 			a.Preferences().SetString("makroCollection", inputPath)
 		}
+
 	}
 	makroCollectionEntry.OnChanged(makroCollectionPath) // run to report any errors
 	return widget.NewCard("Ustawienia makr", "", container.NewVBox(labelSearch, makroSearchEntry, label, makroCollectionEntry, errLabel))

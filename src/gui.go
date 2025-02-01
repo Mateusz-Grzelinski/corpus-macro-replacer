@@ -242,10 +242,12 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	return CorpusFileTreeContainer
 }
 
-func getMacroNameByFileName(a fyne.App, path string) string {
-	makroSearchPath := a.Preferences().String("makroSearchPath")
-	if out := MakroCollectionCache.GetMacroNameByFileName(path); out != nil {
-		return *out
+// best effort, returned path might not exist
+func getMacroNameByFileName(makroSearchPath string, path string, cache *MakroCollection) string {
+	if cache != nil {
+		if out := cache.GetMacroNameByFileName(path); out != nil {
+			return *out
+		}
 	}
 	relPath, err := filepath.Rel(makroSearchPath, path)
 	if err != nil {
@@ -289,7 +291,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 		newMacroPathEntry.OnChanged = func(path string) {
 			// wasteful but the best error reporting
 			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
-			_, err := LoadMakroFromCMKFile(path, &makroRootPath, MakroCollectionCache.GetMakroMappings())
+			_, err := NewMakroFromCMKFile(nil, path, &makroRootPath, MakroCollectionCache.GetMakroMappings())
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))
@@ -349,8 +351,9 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 									makros = &loadedS3DFileForPreview.ElementFile
 								}
 								if makros != nil {
-									makroNameToFind := getMacroNameByFileName(a, targetErr.Path)
-								outterLoop:
+									makroSearchPath := a.Preferences().String("makroSearchPath")
+									makroNameToFind := getMacroNameByFileName(makroSearchPath, targetErr.Path, &MakroCollectionCache)
+								outerLoop:
 									for _, e := range makros.Element {
 										for _, s := range e.Elinks.Spoj {
 											if s.Makro1.MakroName != makroNameToFind {
@@ -370,7 +373,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 													continueRecovery = false
 												}
 											}
-											break outterLoop
+											break outerLoop
 										}
 									}
 									if continueRecovery {
@@ -397,7 +400,8 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				makroErrorLabel.Importance = widget.DangerImportance
 				makroErrorLabel.Show()
 			} else {
-				newMacroNameEntry.SetText(getMacroNameByFileName(a, path))
+				makroSearchPath := a.Preferences().String("makroSearchPath")
+				newMacroNameEntry.SetText(getMacroNameByFileName(makroSearchPath, path, &MakroCollectionCache))
 				makroErrorLabel.Importance = widget.MediumImportance
 				makroErrorLabel.Hide()
 				refreshCorpusPreviewFunc()
@@ -420,7 +424,9 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 						}
 						path := reader.URI().Path()
 						newMacroPathEntry.SetText(path)
-						newMacroNameEntry.SetText(getMacroNameByFileName(a, path))
+
+						makroSearchPath := a.Preferences().String("makroSearchPath")
+						newMacroNameEntry.SetText(getMacroNameByFileName(makroSearchPath, path, &MakroCollectionCache))
 						row.Refresh()
 					}, *myWindow)
 

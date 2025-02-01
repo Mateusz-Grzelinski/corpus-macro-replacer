@@ -25,7 +25,7 @@ func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping 
 			log.Printf("Warning: Makro path seems to be duplicated: '%s' (all paths: %s)", absPathMakroFile, makroFiles)
 		}
 		// todo this call requires new flags to work properly
-		makro, err := LoadMakroFromCMKFile(makroFile, makroRootPath, makroMapping)
+		makro, err := NewMakroFromCMKFile(nil, makroFile, makroRootPath, makroMapping)
 		if err != nil {
 			return nil, err
 		}

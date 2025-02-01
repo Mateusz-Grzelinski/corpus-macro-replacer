@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"cmp"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +12,14 @@ import (
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
 )
+
+type UnknownMakroError struct {
+	name string
+}
+
+func (e *UnknownMakroError) Error() string {
+	return fmt.Sprintf("can not find makro \"%s\"   ", e.name)
+}
 
 const CMKLineSeparator = `,`
 
@@ -58,19 +65,18 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 	}
 }
 
-// key: makro name
-// value: path to file
+// dict["<makro name>"] = "<path to file>"
 type MakroMappings map[string]string
 
-const M1InitialMacroMarker string = ""
+const InitialMacroKey string = ""
 
 // create makro struct from CMK file
 // assert that makro has the same name as file
 // if there is a makro inside makro, it is assumed that it is placed in the same directory as original filename
-// use MakroMappings to resolve names in [MAKRO] section
+// use MakroMappings to resolve names in [MAKRO] section. Usually contains paths relative to makroRootPath
 // makroRootPath + "<makro name>" is used as fallback path when makro name is not in makroMapping. When nil makroFile base path is treated as MakroRootPath, what might be false!
 // usually makroRootPath="C:\Tri D Corpus\Corpus 5.0\Makro\"
-func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping MakroMappings) (*M1, error) {
+func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *string, makroNameToPath MakroMappings) (*M1, error) {
 	if makroFile == "" {
 		return nil, fmt.Errorf("missing input makro file")
 	}
@@ -79,53 +85,70 @@ func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping 
 		makroRootPath = &tmp
 	}
 	makroFile, _ = filepath.Abs(makroFile)
-	initialMakro, err := partialLoadMakroFromCMKFile(makroFile)
+	if makroName == nil {
+		tmp := getMacroNameByFileName(makroFile, makroFile, &MakroCollectionCache)
+		makroName = &tmp
+	}
+	initialMakro, err := partialNewMakroFromCMKFile(*makroName, makroFile)
 	if err != nil {
 		return nil, err
 	}
 
-	unprocessedMakros := map[string]bool{}
-	processedMacros := map[string]*M1{}
+	allMakros := map[string]bool{}
 	for _, subMacro := range initialMakro.Makro {
-		unprocessedMakros[subMacro.EmbeddedMakroName] = false
+		allMakros[subMacro.EmbeddedMakroName] = false
 	}
+	processedMakros := map[string]*M1{}
 	for {
-		var macroToProcess string
+		var makroToProcessName *string
 		// pick next not processed macro
-		for k, v := range unprocessedMakros {
-			if !v {
-				macroToProcess = k
+		for name, isProcessed := range allMakros {
+			if !isProcessed {
+				makroToProcessName = &name
 				break
 			}
 		}
-		unprocessedMakros[macroToProcess] = true
 		// end condition
-		if macroToProcess == "" {
+		if makroToProcessName == nil {
 			break
 		}
+		if *makroToProcessName == "" {
+			return nil, fmt.Errorf("[MAKRO] specifies submakro with empty name")
+		}
+		allMakros[*makroToProcessName] = true
 
-		submacroPath := makroMapping[macroToProcess]
-		submacroName := filepath.Join(*makroRootPath, cmp.Or(submacroPath, macroToProcess+".CMK"))
-		macro, err := partialLoadMakroFromCMKFile(submacroName)
+		submacroPath, found := makroNameToPath[*makroToProcessName]
+		if !found {
+			// best effort search for file in makroRootPath
+			submakroFoundPath, found := findFile(*makroRootPath, *makroToProcessName+".CMK")
+			submacroPath = submakroFoundPath
+			if found != nil {
+				return nil, &UnknownMakroError{name: *makroToProcessName}
+			} else {
+				log.Printf("Warning: makro \"%s\" was found by searching \"%s\": \"%s\"", *makroToProcessName, *makroRootPath, submakroFoundPath)
+			}
+		}
+		makro, err := partialNewMakroFromCMKFile(*makroToProcessName, submacroPath)
 		if err != nil {
 			return nil, err
 		}
-		processedMacros[macroToProcess] = macro
+		processedMakros[*makroToProcessName] = makro
 
-		for _, subMacro := range macro.Makro {
-			_, ok := unprocessedMakros[subMacro.EmbeddedMakroName]
-			if !ok {
-				unprocessedMakros[subMacro.EmbeddedMakroName] = false
+		for _, subMakro := range makro.Makro {
+			_, found := allMakros[subMakro.EmbeddedMakroName]
+			// avoid reading again makro with same name (infinite recursion)
+			if !found {
+				allMakros[subMakro.EmbeddedMakroName] = false
 			}
 		}
 	}
 
-	// make sure all macros are resolved. Follow topological sort
-	resolveSubMakros := map[string]*M1{M1InitialMacroMarker: initialMakro}
-	for name, macro := range processedMacros {
-		resolveSubMakros[name] = macro
+	// make sure all macros are resolved
+	// can contain multiple pointers to same macro
+	resolveSubMakros := map[string]*M1{InitialMacroKey: initialMakro}
+	for name, makro := range processedMakros {
+		resolveSubMakros[name] = makro
 	}
-
 	for continueLoop := true; continueLoop; {
 		continueLoop = false
 		for _, macro := range resolveSubMakros {
@@ -151,7 +174,8 @@ func LoadMakroFromCMKFile(makroFile string, makroRootPath *string, makroMapping 
 }
 
 // same as MakroFromFile but might have unresolved data in m.makro
-func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
+// makroMapping can come from Corpus settings (MakroCollection.dat)
+func partialNewMakroFromCMKFile(makroName string, makroFile string) (*M1, error) {
 	log.Printf("Reading makro: '%s'", makroFile)
 	file, err := os.Open(makroFile)
 	if err != nil {
@@ -161,14 +185,18 @@ func partialLoadMakroFromCMKFile(makroFile string) (*M1, error) {
 	if err != nil {
 		return nil, err
 	}
-	if stat.IsDir() {
-		return nil, fmt.Errorf("makro file is directory %s", makroFile)
+	if !stat.Mode().IsRegular() {
+		abs, err := filepath.Abs(makroFile)
+		if err == nil {
+			return nil, fmt.Errorf("path is not a file %s (%s)", abs, makroFile)
+		} else {
+			return nil, fmt.Errorf("path is not a file %s", makroFile)
+		}
 	}
 	defer file.Close()
 
 	m := new(M1)
-	m.MakroName = strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
-	// true makro name is in MakroCollection.dat (binary file)
+	m.MakroName = makroName
 
 	dec := transform.NewReader(file, charmap.Windows1250.NewDecoder())
 	scanner := bufio.NewScanner(dec)

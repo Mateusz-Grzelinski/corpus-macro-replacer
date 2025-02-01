@@ -80,7 +80,7 @@ const (
 	HexStringUtf            = 0x14
 )
 
-func LoadMakroCollection(path string) (MakroCollection, error) {
+func NewMakroCollection(path string) (MakroCollection, error) {
 	var result = MakroCollection{}
 	f, err := os.Open(path)
 	if err != nil {
@@ -108,8 +108,10 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 			// fmt.Println(*sec)
 			switch *sec {
 			case KWMakroCollectionItem:
+				if lastItem != nil {
+					result = append(result, *lastItem)
+				}
 				lastItem = &MakroCollectionItem{}
-				result = append(result, *lastItem)
 			}
 		case HexString:
 			keyWord, err := ReadLenAndString(br)
@@ -118,8 +120,7 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 			}
 			// fmt.Print("Key: ")
 			// fmt.Println(*keyWord)
-			lastValidKW := *keyWord
-			switch lastValidKW {
+			switch *keyWord {
 			case KWMakroName:
 				value, err := ReadKWAndLenAndString(br)
 				if err != nil {
@@ -152,10 +153,20 @@ func LoadMakroCollection(path string) (MakroCollection, error) {
 				}
 				lastItem.TextColorBG = color
 			}
-		case HexDoNothing:
+		case HexDoNothing: // we
 		}
 		if err != nil {
 			// end of file
+			if lastItem != nil {
+				if len(result) == 0 {
+					result = append(result, *lastItem)
+				} else {
+					actualLastItemAddress := &result[len(result)-1]
+					if actualLastItemAddress != lastItem {
+						result = append(result, *lastItem)
+					}
+				}
+			}
 			break
 		}
 	}
@@ -328,6 +339,6 @@ func ReadLenAndColor(r *bufio.Reader) (color.Color, error) {
 		out := color.NRGBA{R: grayscale, G: grayscale, B: grayscale, A: A}
 		return out, nil
 	} else {
-		return nil, fmt.Errorf("unusual color length: %d", n)
+		return nil, fmt.Errorf("unhandled color length: %d", n)
 	}
 }
