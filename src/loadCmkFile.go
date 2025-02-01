@@ -13,11 +13,11 @@ import (
 	"golang.org/x/text/transform"
 )
 
-type UnknownMakroError struct {
+type CMKUnknownMakroError struct {
 	name string
 }
 
-func (e *UnknownMakroError) Error() string {
+func (e *CMKUnknownMakroError) Error() string {
 	return fmt.Sprintf("can not find makro \"%s\"   ", e.name)
 }
 
@@ -49,16 +49,7 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 		m.Pila = append(m.Pila, GenericNodeWithDat{DAT: currentSectionText})
 	case "makro":
 		embeddedMakro := EmbeddedMakro{GenericNodeWithDat: GenericNodeWithDat{DAT: currentSectionText}, MAK: nil}
-		for _, line := range strings.Split(currentSectionText, CMKLineSeparator) { // todo iterate
-			line = decodeCMKLine(line)
-			nameAndValue := strings.SplitN(line, "=", 2)
-			if strings.ToLower(currentSection) == "makro" && strings.ToLower(nameAndValue[0]) == "name" {
-				if len(nameAndValue) != 2 {
-					log.Printf("Error, I do not know how to handle this case. Is there '=' in file name? %s", line)
-				}
-				embeddedMakro.EmbeddedMakroName = nameAndValue[1]
-			}
-		}
+		embeddedMakro.EmbeddedMakroName = embeddedMakro.CalledWith()
 		m.Makro = append(m.Makro, embeddedMakro)
 	default:
 		log.Printf("ERROR: unknown section name: '%s', sectionText: %s\n", currentSection, currentSectionText)
@@ -123,7 +114,7 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 			submakroFoundPath, found := findFile(*makroRootPath, *makroToProcessName+".CMK")
 			submacroPath = submakroFoundPath
 			if found != nil {
-				return nil, &UnknownMakroError{name: *makroToProcessName}
+				return nil, &CMKUnknownMakroError{name: *makroToProcessName}
 			} else {
 				log.Printf("Warning: makro \"%s\" was found by searching \"%s\": \"%s\"", *makroToProcessName, *makroRootPath, submakroFoundPath)
 			}

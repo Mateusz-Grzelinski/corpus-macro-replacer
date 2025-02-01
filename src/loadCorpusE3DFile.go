@@ -91,6 +91,21 @@ type EmbeddedMakro struct {
 	MAK *M1 `xml:"MAK,omitempty"`
 }
 
+// extracts name of submacro that is used in Corpus call in [MAKRO] section
+func (em *EmbeddedMakro) CalledWith() string {
+	for _, line := range decodeAllCMKLines(em.DAT) {
+		nameAndValue := strings.SplitN(line, "=", 2)
+		if strings.ToLower(nameAndValue[0]) == "name" {
+			if len(nameAndValue) != 2 {
+				log.Printf("Error, I do not know how to read name from EmbeddedMakro. Is there '=' in file name? %s", line)
+				return ""
+			}
+			return nameAndValue[1]
+		}
+	}
+	return ""
+}
+
 /*
 Represents makro as defined in Corpus 5.0 (reverse engineered).
 Help is available only in Corpus makro editor.
@@ -139,7 +154,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	if m.Joint != nil {
-		if _, err := w.Write([]byte("\n[JOINT]\n")); err != nil {
+		if _, err := w.Write([]byte("\n\n[JOINT]\n")); err != nil {
 			return err
 		}
 		text := strings.Join(decodeAllCMKLines(m.Joint.DAT), "\n")
@@ -148,7 +163,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	if m.Formule != nil {
-		if _, err := w.Write([]byte("\n[FORMULE]\n")); err != nil {
+		if _, err := w.Write([]byte("\n\n[FORMULE]\n")); err != nil {
 			return err
 		}
 		text := strings.Join(decodeAllCMKLines(m.Formule.DAT), "\n")
@@ -158,7 +173,7 @@ func (m *M1) Save(w io.Writer) error {
 	}
 
 	for i, item := range m.Pocket {
-		section := fmt.Sprintf("\n[POCKET%d]\n", i)
+		section := fmt.Sprintf("\n\n[POCKET%d]\n", i)
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
@@ -168,7 +183,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	for i, item := range m.Potrosni {
-		section := fmt.Sprintf("\n[POTROSNI%d]\n", i)
+		section := fmt.Sprintf("\n\n[POTROSNI%d]\n", i)
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
@@ -178,7 +193,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	for i, item := range m.Grupa {
-		section := fmt.Sprintf("\n[GRUPA%d]\n", i)
+		section := fmt.Sprintf("\n\n[GRUPA%d]\n", i)
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
@@ -188,7 +203,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	for i, item := range m.Raster {
-		section := fmt.Sprintf("\n[RASTER%d]\n", i)
+		section := fmt.Sprintf("\n\n[RASTER%d]\n", i)
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
@@ -198,7 +213,7 @@ func (m *M1) Save(w io.Writer) error {
 		}
 	}
 	for i, item := range m.Makro {
-		section := fmt.Sprintf("\n[MAKRO%d]\n", i)
+		section := fmt.Sprintf("\n\n[MAKRO%d]\n", i)
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
@@ -210,6 +225,37 @@ func (m *M1) Save(w io.Writer) error {
 
 	return nil
 }
+
+func (ef *ElementFile) VisitElementsAndSubelements(f func(*Element)) {
+	for _, e := range ef.Element {
+		e.VisitElementsAndSubelements(f)
+	}
+}
+
+func (e *Element) VisitElementsAndSubelements(f func(*Element)) {
+	f(e)
+	for _, sube := range e.ElmList.Elm {
+		sube.VisitElementsAndSubelements(f)
+	}
+}
+
+// visit self and submakros
+func (m *M1) VisitSubmakros(f func(parent *M1, embededParent *EmbeddedMakro, child *EmbeddedMakro)) {
+	f(m, nil, nil) // entrypoiny
+	m.partialVisitSubmakros(nil, f)
+}
+
+func (m *M1) partialVisitSubmakros(embededParent *EmbeddedMakro, f func(parent *M1, embededParent *EmbeddedMakro, child *EmbeddedMakro)) {
+	for _, submacro := range m.Makro {
+		f(m, embededParent, &submacro)
+		submacro.MAK.partialVisitSubmakros(&submacro, f)
+	}
+}
+
+// // visit self and submakros
+// func (em *EmbeddedMakro) VisitSubmakros(f func(parent *M1, child *EmbeddedMakro)) {
+// 	em.MAK.VisitSubmakros(f)
+// }
 
 func (tr TrimmerDecoder) Token() (xml.Token, error) {
 	t, err := tr.decoder.Token()

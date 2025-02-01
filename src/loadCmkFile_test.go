@@ -114,7 +114,7 @@ func TestNewMakroFromCMKFileLoadMakroByNameBasicNameMappingFails(t *testing.T) {
 		t.Error("makro should be nil")
 		t.Log(makro)
 	}
-	targetErr, ok := err.(*UnknownMakroError)
+	targetErr, ok := err.(*CMKUnknownMakroError)
 	if !ok || targetErr.name != "creative_user_wants_to_load_simple" {
 		t.Error("error should be type UnknownMakroError")
 		t.Log(err)
@@ -132,7 +132,7 @@ func TestNewMakroFromCMKFileLoadMakroByNameFindInFilesFails(t *testing.T) {
 		t.Error("makro should be nil")
 		t.Log(makro)
 	}
-	targetErr, ok := err.(*UnknownMakroError)
+	targetErr, ok := err.(*CMKUnknownMakroError)
 	if !ok || targetErr.name != "simple" {
 		t.Error("error should be type UnknownMakroError")
 		t.Log(err)
