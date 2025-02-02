@@ -3,12 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -50,6 +52,7 @@ var corpusPreviewContainer *ElementFileContainer
 var ListOfLoadedFilesContainer *fyne.Container
 var MacrosToChangeEntries []*widget.Entry
 var MacrosToChangeNamesEntries []*widget.Entry
+var MacrosToChangeReNamesEntries []*widget.Entry
 var AddMakroButton *widget.Button
 var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
@@ -277,7 +280,20 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 
 	AddMakroButton = widget.NewButton("Dodaj makro do zamiany", func() {
 		newMacroNameEntry := widget.NewEntry()
-		newMacroNameEntry.PlaceHolder = "Nazwa makra: Nawierty_uniwersalne_28mm"
+		newMacroNameEntry.PlaceHolder = "Makro: Nawierty_uniwersalne"
+		renameMacroNameEntry := widget.NewEntry()
+		renameMacroNameEntry.PlaceHolder = "Nawierty_uniwersalne_28mm"
+		renameMacroNameEntry.Disable()
+		renameBool := widget.NewCheck("Zmień na", func(checked bool) {
+			if checked {
+				if renameMacroNameEntry.Text == "" {
+					renameMacroNameEntry.SetText(newMacroNameEntry.Text)
+				}
+				renameMacroNameEntry.Enable()
+			} else {
+				renameMacroNameEntry.Disable()
+			}
+		})
 		autoFixError := widget.NewButton("AutoFix", nil)
 		autoFixError.Hide()
 		makroErrorLabel := widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -293,11 +309,21 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))
 				var unkownMakroError *CMKUnknownMakroError
-				if errors.As(err, &unkownMakroError) {
+				var targetErr *fs.PathError
+				if errors.As(err, &targetErr) && targetErr.Op == "open" && errors.Is(targetErr.Err, syscall.ERROR_FILE_NOT_FOUND) {
 					autoFixError.Show()
 					autoFixError.OnTapped = func() {
-						makroRecoveryDialog := NewDialogMakroRecovery(a, *myWindow, unkownMakroError)
-						makroRecoveryDialog.Resize(DialogSizeDefault)
+						makroRecoveryDialog := NewDialogMakroRecovery(a, *myWindow, newMacroNameEntry.Text)
+						makroRecoveryDialog.SetOnClosed(func() {
+							tmpNewMacroPathEntry := newMacroPathEntry // idk if tmp is needed
+							tmpNewMacroPathEntry.OnChanged(path)
+						}) // rerun loading CMK to clear errors
+						makroRecoveryDialog.Show()
+					}
+				} else if errors.As(err, &unkownMakroError) {
+					autoFixError.Show()
+					autoFixError.OnTapped = func() {
+						makroRecoveryDialog := NewDialogMakroRecovery(a, *myWindow, unkownMakroError.name)
 						makroRecoveryDialog.SetOnClosed(func() {
 							tmpNewMacroPathEntry := newMacroPathEntry // idk if tmp is needed
 							tmpNewMacroPathEntry.OnChanged(path)
@@ -318,10 +344,18 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 			}
 			makroErrorLabel.Refresh()
 		}
-		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroPathEntry)           // save to global var
-		MacrosToChangeNamesEntries = append(MacrosToChangeNamesEntries, newMacroNameEntry) // save global var
+		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroPathEntry)                  // save to global var
+		MacrosToChangeNamesEntries = append(MacrosToChangeNamesEntries, newMacroNameEntry)        // save global var
+		MacrosToChangeReNamesEntries = append(MacrosToChangeReNamesEntries, renameMacroNameEntry) // save global var
 		var row *fyne.Container
-		row = container.NewBorder(newMacroNameEntry, container.NewVBox(container.NewBorder(nil, nil, nil, autoFixError, makroErrorLabel), widget.NewSeparator()), nil,
+		row = container.NewBorder(
+			// Makro name in corpus
+			container.NewVBox(
+				newMacroNameEntry,
+				container.NewBorder(nil, nil, renameBool, nil, renameMacroNameEntry),
+			),
+			// show erros
+			container.NewVBox(container.NewBorder(nil, nil, nil, autoFixError, makroErrorLabel), widget.NewSeparator()), nil,
 			container.NewHBox(
 				widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
 					fileOpenDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
@@ -354,6 +388,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 					macrosToChangeContainer.Remove(row)
 					MacrosToChangeNamesEntries = RemoveEntry(MacrosToChangeNamesEntries, newMacroNameEntry)
+					MacrosToChangeReNamesEntries = RemoveEntry(MacrosToChangeReNamesEntries, renameMacroNameEntry)
 					MacrosToChangeEntries = RemoveEntry(MacrosToChangeEntries, newMacroPathEntry)
 					macrosToChangeContainer.Refresh()
 					refreshCorpusPreviewFunc()

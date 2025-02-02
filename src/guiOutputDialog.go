@@ -54,17 +54,17 @@ func removeRelativePrefix(path string) string {
 	return path
 }
 
-func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
+func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, makroRename map[string]string, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("panic occured: ", r)
 			*err = fmt.Sprintf("⚠ ERROR (panic): %s", inputFile)
 		}
 	}()
-	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, alwaysConvertLocalToGlobal, verbose, minify)
+	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, makroRename, alwaysConvertLocalToGlobal, verbose, minify)
 }
 
-func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping MakroMappings) {
+func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, makroOldNameToNewName map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping MakroMappings) {
 	log.Printf("Generating output to: %s", outputDir)
 	// originalStderr := os.Stderr
 	// // Create a pipe to capture stderr
@@ -98,10 +98,10 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		relInputFile, _ := filepath.Rel(outputDir, inputFile)
 		cleanedRelInputFile := removeRelativePrefix(relInputFile)
 		outputFile := filepath.Join(outputDir, cleanedRelInputFile)
-		var specialError *string = new(string)
-		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, specialError, alwaysConvertLocalToGlobal, verbose, minify)
-		if *specialError != "" {
-			panicErrors = append(panicErrors, *specialError)
+		var panicErrorToReport *string = new(string)
+		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, makroOldNameToNewName, panicErrorToReport, alwaysConvertLocalToGlobal, verbose, minify)
+		if *panicErrorToReport != "" {
+			panicErrors = append(panicErrors, *panicErrorToReport)
 			currentLog = append(currentLog, fmt.Sprintf("⚠ FATAL: '%s'", outputFile))
 		}
 		if err != nil {
@@ -199,14 +199,18 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 						}),
 						widget.NewButtonWithIcon("Wykonaj", theme.MediaPlayIcon(), func() {
 							macrosTochange := []string{}
-							for _, e := range MacrosToChangeEntries {
+							macrosToRename := map[string]string{}
+							for i, e := range MacrosToChangeEntries {
 								macrosTochange = append(macrosTochange, e.Text)
+								if !e.Disabled() {
+									macrosToRename[MacrosToChangeNamesEntries[i].Text] = MacrosToChangeReNamesEntries[i].Text
+								}
 							}
 							alwaysConvertLocalToGlobal := a.Preferences().Bool("alwaysConvertLocalToGlobal")
 							verbose := a.Preferences().Bool("verbose")
 							minify := a.Preferences().Bool("minify")
 							makroRootPath := a.Preferences().String("makroSearchPath")
-							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, MakroCollectionCache.GetMakroMappings())
+							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, macrosToRename, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, MakroCollectionCache.GetMakroMappings())
 							logWindow.Refresh()
 						}),
 						widget.NewButtonWithIcon("", theme.MoreVerticalIcon(), func() {

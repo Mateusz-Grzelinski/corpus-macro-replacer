@@ -34,7 +34,7 @@ func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping 
 	return makrosToReplace, nil
 }
 
-func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
+func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1, makroRename map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
@@ -43,89 +43,69 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 	macrosUpdated := 0
 	macrosSkipped := 0
 
+	handleVisitElement := func(element *Element) {
+		visitedDaske := []string{}
+		updatedDaske := map[string]int{}
+		skippedDaske := map[string]int{}
+		for i, spoj := range element.Elinks.Spoj {
+			adIndex, _ := strconv.Atoi(spoj.O1.Value)
+			daske := element.Daske.AD[adIndex]
+			daskeName := daske.DName.Value
+			visitedDaske = append(visitedDaske, daskeName)
+			oldMakro := spoj.Makro1
+			newMakro, newMakroExists := makrosToReplace[oldMakro.MakroName]
+			if !newMakroExists {
+				macrosSkipped++
+				skippedDaske[daskeName]++
+				continue
+			}
+			renameTo := makroRename[oldMakro.MakroName]
+			UpdateMakro(&oldMakro, newMakro, &renameTo, alwaysConvertLocalToGlobal)
+			element.Elinks.Spoj[i].Makro1 = *newMakro
+			// spoj.Makro1 = *newMakro
+
+			// todo reorder variables so that ones with the same name are next to each other
+			// oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
+			// newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newMacro.Varijable.DAT)
+			macrosUpdated++
+			updatedDaske[daskeName]++
+		}
+		if verbose {
+			log.Printf("  Cabinet '%s'\n", element.EName.Value)
+			for _, name := range visitedDaske {
+				log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
+			}
+		}
+	}
+
 	// todo how to handle 2 very similar types??? ElementFile vs ProjectFile
 	visitCorpusE3DFile := func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
-		var root ElementFile
+		var rootCorpusFile ElementFile
 		decoder.Strict = true
-		err := decoder.DecodeElement(&root, &start)
+		err := decoder.DecodeElement(&rootCorpusFile, &start)
 		decoder.Strict = false
 		if err != nil {
 			log.Printf("%s: %s", inputFile, err)
 		}
-		for _, element := range root.Element {
-			visitedDaske := []string{}
-			updatedDaske := map[string]int{}
-			skippedDaske := map[string]int{}
-			for _, spoj := range element.Elinks.Spoj {
-				adIndex, _ := strconv.Atoi(spoj.O1.Value)
-				daske := element.Daske.AD[adIndex]
-				daskeName := daske.DName.Value
-				visitedDaske = append(visitedDaske, daskeName)
-				oldMakro := spoj.Makro1
-				newMakro, newMakroExists := makrosToReplace[oldMakro.MakroName]
-				if !newMakroExists {
-					macrosSkipped++
-					skippedDaske[daskeName]++
-					continue
-				}
-				UpdateMakro(&oldMakro, newMakro, alwaysConvertLocalToGlobal)
-
-				// todo reorder variables so that ones with the same name are next to each other
-				// oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
-				// newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newMacro.Varijable.DAT)
-				macrosUpdated++
-				updatedDaske[daskeName]++
-			}
-			if verbose {
-				log.Printf("  Cabinet '%s'\n", element.EName.Value)
-				for _, name := range visitedDaske {
-					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
-				}
-			}
-		}
+		// todo visit all elements including groups
+		rootCorpusFile.VisitElementsAndSubelements(handleVisitElement)
 		log.Printf("  Summary: updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
 
-		return root
+		return rootCorpusFile
 	}
 
 	visitCorpusS3DFile := func(decoder *xml.Decoder, start xml.StartElement) xml.Token {
-		var root ProjectFile
+		var rootCorpusFile ProjectFile
 		decoder.Strict = true
-		err := decoder.DecodeElement(&root, &start)
+		err := decoder.DecodeElement(&rootCorpusFile, &start)
 		decoder.Strict = false
 		if err != nil {
 			log.Printf("%s: %s", inputFile, err)
 		}
-		for _, element := range root.Element {
-			visitedDaske := []string{}
-			updatedDaske := map[string]int{}
-			skippedDaske := map[string]int{}
-			for _, spoj := range element.Elinks.Spoj {
-				adIndex, _ := strconv.Atoi(spoj.O1.Value)
-				daske := element.Daske.AD[adIndex]
-				daskeName := daske.DName.Value
-				visitedDaske = append(visitedDaske, daskeName)
-				oldMakro := spoj.Makro1
-				newMakro, newMakroExists := makrosToReplace[oldMakro.MakroName]
-				if !newMakroExists {
-					macrosSkipped++
-					skippedDaske[daskeName]++
-					continue
-				}
-				UpdateMakro(&oldMakro, newMakro, alwaysConvertLocalToGlobal)
-				macrosUpdated++
-				updatedDaske[daskeName]++
-			}
-			if verbose {
-				log.Printf("  Cabinet '%s'\n", element.EName.Value)
-				for _, name := range visitedDaske {
-					log.Printf("    Updated %d macros, %d skipped in plate '%s'\n", updatedDaske[name], skippedDaske[name], name)
-				}
-			}
-		}
+		rootCorpusFile.VisitElementsAndSubelements(handleVisitElement)
 		log.Printf("  Summary: updated %d macros, %d skipped\n", macrosUpdated, macrosSkipped)
 
-		return root
+		return rootCorpusFile
 	}
 
 	ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
@@ -169,7 +149,7 @@ func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFi
 	for _, inputFile := range foundCorpusFiles {
 		relInputFile, _ := filepath.Rel(inputFolder, inputFile)
 		outputFile := filepath.Join(outputFolder, relInputFile)
-		err := ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, alwaysConvertLocalToGlobal, verbose, minify)
+		err := ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, map[string]string{}, alwaysConvertLocalToGlobal, verbose, minify)
 		if err != nil {
 			if errOut != nil {
 				errOut = fmt.Errorf("%w\n%w", errOut, err)
@@ -264,7 +244,7 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 
 		makrosToReplace, err := ReadMakrosFromCMK(makroFiles, nil, nil)
 		log.Fatalf("can not read makros: %s", err)
-		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace, *alwaysConvertLocalToGlobal, *verbose, *minify)
+		ReplaceMakroInCorpusFile(*input, *output, makrosToReplace, map[string]string{}, *alwaysConvertLocalToGlobal, *verbose, *minify)
 	}
 
 	// makroFile := `C:\Tri D Corpus\Corpus 5.0\Makro\custom.CMK`

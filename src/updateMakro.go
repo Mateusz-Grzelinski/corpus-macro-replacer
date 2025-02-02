@@ -72,9 +72,9 @@ type Change struct {
 - discard other old sections (groupa, potrosni, makro, pila)
 - todo handle case insensitive and global names: _VAR==VAR==var==vAr
 */
-func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) []Change {
+func UpdateMakro(oldMacro *M1, macroToBeChanged *M1, renameTo *string, alwaysConvertLocalToGlobal bool) []Change {
 	oldVariablesKeys, oldValues, _ := loadValuesFromSection(oldMacro.Varijable.DAT)
-	newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(newMacro.Varijable.DAT)
+	newVariablesKeys, newValues, newVariablesComments := loadValuesFromSection(macroToBeChanged.Varijable.DAT)
 
 	// combine old and new in "smart way"
 	var outputVarijable strings.Builder
@@ -151,7 +151,10 @@ func UpdateMakro(oldMacro *M1, newMacro *M1, alwaysConvertLocalToGlobal bool) []
 		}
 	}
 
-	newMacro.Varijable.DAT, _ = strings.CutSuffix(outputVarijable.String(), CMKLineSeparator)
-	newMacro.Joint = oldMacro.Joint
+	if renameTo != nil {
+		macroToBeChanged.MakroName = *renameTo
+	}
+	macroToBeChanged.Varijable.DAT, _ = strings.CutSuffix(outputVarijable.String(), CMKLineSeparator)
+	macroToBeChanged.Joint = oldMacro.Joint
 	return updateResultVarijable
 }

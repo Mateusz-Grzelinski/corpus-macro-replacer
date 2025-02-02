@@ -12,9 +12,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnknownMakroError) *dialog.CustomDialog {
+func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *dialog.CustomDialog {
 	makroSearchPath := a.Preferences().String("makroSearchPath")
-	missingMakroPath := filepath.Join(makroSearchPath, unkownMakroError.name+".CMK")
+	missingMakroPath := filepath.Join(makroSearchPath, failedMakroName+".CMK")
 	card1Result := widget.NewLabel("")
 	card1Result.Wrapping = fyne.TextWrapBreak
 	card1Result.Importance = widget.DangerImportance
@@ -41,7 +41,7 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnkn
 	filterDialog := dialog.NewCustom("Szukam brakującego makra", "Zamknij", container.NewVBox(card1, card2, cardFail, cardOk), w)
 	continueRecovery := true
 	if continueRecovery {
-		foundFile, _ := findFile(makroSearchPath, unkownMakroError.name+".CMK")
+		foundFile, _ := findFile(makroSearchPath, failedMakroName+".CMK")
 		if foundFile != "" {
 			err := copyFile(foundFile, missingMakroPath)
 			if err != nil {
@@ -52,7 +52,7 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnkn
 			}
 			continueRecovery = false
 		} else {
-			card1Result.SetText(fmt.Sprintf("Nie znaleziono: \"%s\" w \"%s\"", unkownMakroError.name+".CMK", makroSearchPath))
+			card1Result.SetText(fmt.Sprintf("Nie znaleziono: \"%s\" w \"%s\"", failedMakroName+".CMK", makroSearchPath))
 		}
 	}
 
@@ -77,19 +77,19 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnkn
 						} else {
 							makroName = parent.MakroName
 						}
-						if makroName != unkownMakroError.name {
+						if makroName != failedMakroName {
 							return
 						}
 						f, err := os.Create(missingMakroPath)
 						if err != nil {
-							card2Result.SetText(fmt.Sprintf("otwarty plik Corpusa ma makro \"%s\", ale nie można go zapisać: %s", unkownMakroError.name, err))
+							card2Result.SetText(fmt.Sprintf("otwarty plik Corpusa ma makro \"%s\", ale nie można go zapisać: %s", failedMakroName, err))
 						} else {
 							_, err1 := f.Write([]byte(fmt.Sprintf("// CorpusMakroReplacer: odzyskano z %s\n", SelectedPath)))
 							err := s.Makro1.Save(f)
 							if err1 != nil && err != nil {
-								card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa, ale wystąpił błąd przy zapisywaniu: %s", unkownMakroError.name, err))
+								card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa, ale wystąpił błąd przy zapisywaniu: %s", failedMakroName, err))
 							} else {
-								card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa i zapisano: %s. Zawartość pliku może być niekatualna.", unkownMakroError.name, missingMakroPath))
+								card2Result.SetText(fmt.Sprintf("odzyskano Makro \"%s\" z Corpusa i zapisano: %s. Zawartość pliku może być niekatualna.", failedMakroName, missingMakroPath))
 								card2Result.Importance = widget.HighImportance
 								continueRecovery = false
 							}
@@ -98,10 +98,10 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnkn
 				}
 			})
 			if continueRecovery {
-				card2Result.SetText(fmt.Sprintf("nie znaleziono Makra \"%s\" w otwartym pliku Corpusa", unkownMakroError.name))
+				card2Result.SetText(fmt.Sprintf("nie znaleziono Makra \"%s\" w otwartym pliku Corpusa", failedMakroName))
 			}
 		} else {
-			card2Result.SetText(fmt.Sprintf("otwórz plik corpusa aby poszukać w nim Makra: \"%s\"", unkownMakroError.name))
+			card2Result.SetText(fmt.Sprintf("otwórz plik corpusa aby poszukać w nim Makra: \"%s\"", failedMakroName))
 		}
 		card2.Show()
 	}
@@ -112,5 +112,6 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, unkownMakroError *CMKUnkn
 		// autoFixError.Hide()
 		cardOk.Show()
 	}
+	filterDialog.Resize(DialogSizeDefault)
 	return filterDialog
 }

@@ -208,16 +208,30 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	}
 	mc.contentRead.Hide()
 
-	if compact {
-		mc.openButton.SetText(mc.parentPlate.openButton.Text + "/" + cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
-	} else {
-		mc.openButton.SetText(cmp.Or(newMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)")
+	{
+		var renamed *string = nil
+		for i, changeEntry := range MacrosToChangeNamesEntries {
+			if changeEntry.Text == oldMakro.MakroName {
+				renamed = &MacrosToChangeReNamesEntries[i].Text
+			}
+		}
+		var makroNameLabel string
+		if renamed != nil && renamed != &oldMakro.MakroName {
+			makroNameLabel = cmp.Or(oldMakro.MakroName, "<Brak nazwy>") + " -> " + *renamed + " (porównanie z plikiem .CMK)"
+		} else {
+			makroNameLabel = cmp.Or(oldMakro.MakroName, "<Brak nazwy>") + " (porównanie z plikiem .CMK)"
+		}
+		if compact {
+			mc.openButton.SetText(mc.parentPlate.openButton.Text + "/" + makroNameLabel)
+		} else {
+			mc.openButton.SetText(makroNameLabel)
+		}
 	}
 	mc.contentHeader.Refresh()
 
 	{ // VARIJABLE
 		// todo only varijable changes are returned
-		varijableChanges := UpdateMakro(mc.oldMakro, mc.newMakro, false)
+		varijableChanges := UpdateMakro(mc.oldMakro, mc.newMakro, nil, false)
 		old, new := smartTextComparison(varijableChanges)
 		newRichText := NewRichTextFromCode("[VARIJABLE]\n// po zaktualizowaniu z pliku .CMK, ", new)
 		oldRichText := NewRichTextFromCode("[VARIJABLE]\n// wczytane z Corpusa\n", old)
@@ -299,12 +313,12 @@ func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
 
 	if oldMakro.MakroName == "" {
 		mc.loadThisMacroButton.Disable()
+		// todo
 		if compact {
 			mc.openButton.SetText(mc.parentPlate.openButton.Text + "/<Brak nazwy>")
 			mc.contentHeader.Show()
 		} else {
 			mc.openButton.SetText("<Brak nazwy>")
-
 		}
 	} else {
 		mc.loadThisMacroButton.Enable()

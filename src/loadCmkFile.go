@@ -77,7 +77,7 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 	}
 	makroFile, _ = filepath.Abs(makroFile)
 	if makroName == nil {
-		tmp := getMacroNameByFileName(makroFile, makroFile, &MakroCollectionCache)
+		tmp := getMacroNameByFileName(makroFile, makroFile, &MakroCollectionCache) // ugh refering to global var
 		makroName = &tmp
 	}
 	initialMakro, err := partialNewMakroFromCMKFile(*makroName, makroFile)
