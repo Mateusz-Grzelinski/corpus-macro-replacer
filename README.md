@@ -17,6 +17,13 @@ There are still bugs in code, expect some crashes.
 
 This program is available with UI or via command line. Just run with no arguments to start UI.
 
+Terminal output of GUI is usefull for debugging.
+
+1. Make sure that your Makro search path and MakroCollection.dat is set to your corpus version
+2. Open folder that contains Corpus files S3D and E3D are tested
+3. Click folder of file and add files to selected (down right menu)
+4. Run the program (top right button)
+
 ![image](https://github.com/user-attachments/assets/c6382ecf-fa37-4229-acdd-0c62d041304e)
 
 # Command line usage

@@ -14,7 +14,7 @@ import (
 
 //go:generate fyne bundle -o src/bundled.go assets/
 
-const Version = "0.5"
+const Version = "0.6"
 
 func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping MakroMappings) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
