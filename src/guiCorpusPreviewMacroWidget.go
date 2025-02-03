@@ -231,7 +231,9 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 
 	{ // VARIJABLE
 		// todo only varijable changes are returned
-		varijableChanges := UpdateMakro(mc.oldMakro, mc.newMakro, nil, false)
+
+		newMakroCopyUntilIFixTheUpdateMakro := *newMakro
+		varijableChanges := UpdateMakro(mc.oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, nil, false)
 		old, new := smartTextComparison(varijableChanges)
 		newRichText := NewRichTextFromCode("[VARIJABLE]\n// po zaktualizowaniu z pliku .CMK, ", new)
 		oldRichText := NewRichTextFromCode("[VARIJABLE]\n// wczytane z Corpusa\n", old)
