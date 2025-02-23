@@ -27,8 +27,8 @@ import (
 
 const (
 	CorpusMacroReplacerDefaultPath = `C:\Tri D Corpus\CorpusMacroReplacer\`
-	CorpusFileBrowserDefaultPath   = `file://C:\Tri D Corpus\Corpus 5.0\elmsav\`
-	MacrosDefaultPath              = `file://C:\Tri D Corpus\Corpus 5.0\Makro\`
+	CorpusFileBrowserDefaultPath   = `file://C:\Tri D Corpus\Corpus 6.0\elmsav\`
+	MacrosDefaultPath              = `file://C:\Tri D Corpus\Corpus 6.0\Makro\`
 )
 
 var corpusMimeType = []string{"text/plain"}
@@ -205,7 +205,7 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 			CorpusFileTreeContainer.Remove(fileTree)
 			fileTree = xWidget.NewFileTree(storage.NewFileURI(lu.Path()))
 			fileTree.OnSelected = CorpusFileTreeOnSelected
-			fileTree.Filter = storage.NewExtensionFileFilter(corpustExtensions)
+			// fileTree.Filter = storage.NewExtensionFileFilter(corpustExtensions)
 			defaultContainer.RemoveAll()
 			CorpusFileTreeContainer.Remove(defaultContainer)
 			CorpusFileTreeContainer.Add(fileTree)
@@ -219,6 +219,8 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 			a.Preferences().SetStringList("recentlyUsedFodlers", lastList)
 		}, *myWindow)
 
+		// fileBrowserDefaultPath := cmp.Or(filepath.Dir(a.Preferences().String("makroSearchPath")), `C:\Tri D Corpus\Corpus 6.0\Makro`)
+		// uri, err := storage.ParseURI("file://" + fileBrowserDefaultPath)
 		uri, err := storage.ParseURI(CorpusFileBrowserDefaultPath)
 		if err == nil {
 			listable, err := storage.ListerForURI(uri)

@@ -62,7 +62,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 			renameTo := makroRename[oldMakro.MakroName]
 			newMakroCopyUntilIFixTheUpdateMakro := *newMakro
 			UpdateMakro(&oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, &renameTo, alwaysConvertLocalToGlobal)
-			element.Elinks.Spoj[i].Makro1 = *newMakro
+			element.Elinks.Spoj[i].Makro1 = newMakroCopyUntilIFixTheUpdateMakro
 			// spoj.Makro1 = *newMakro
 
 			// todo reorder variables so that ones with the same name are next to each other

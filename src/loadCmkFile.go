@@ -67,7 +67,7 @@ const InitialMacroKey string = ""
 // use MakroMappings to resolve names in [MAKRO] section. Usually contains paths relative to makroRootPath
 // makroRootPath + "<makro name>" is used as fallback path when makro name is not in makroMapping. When nil makroFile base path is treated as MakroRootPath, what might be false!
 // usually makroRootPath="C:\Tri D Corpus\Corpus 5.0\Makro\"
-func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *string, makroNameToPath MakroMappings) (*M1, error) {
+func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *string, makroNameToPathRelative MakroMappings) (*M1, error) {
 	if makroFile == "" {
 		return nil, fmt.Errorf("missing input makro file")
 	}
@@ -108,18 +108,20 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 		}
 		allMakros[*makroToProcessName] = true
 
-		submacroPath, found := makroNameToPath[*makroToProcessName]
-		if !found {
+		submacroPathAbs, found := makroNameToPathRelative[*makroToProcessName]
+		if found {
+			submacroPathAbs = filepath.Join(*makroRootPath, submacroPathAbs)
+		} else {
 			// best effort search for file in makroRootPath
 			submakroFoundPath, found := findFile(*makroRootPath, *makroToProcessName+".CMK")
-			submacroPath = submakroFoundPath
+			submacroPathAbs = submakroFoundPath
 			if found != nil {
 				return nil, &CMKUnknownMakroError{name: *makroToProcessName}
 			} else {
 				log.Printf("Warning: makro \"%s\" was found by searching \"%s\": \"%s\"", *makroToProcessName, *makroRootPath, submakroFoundPath)
 			}
 		}
-		makro, err := partialNewMakroFromCMKFile(*makroToProcessName, submacroPath)
+		makro, err := partialNewMakroFromCMKFile(*makroToProcessName, submacroPathAbs)
 		if err != nil {
 			return nil, err
 		}

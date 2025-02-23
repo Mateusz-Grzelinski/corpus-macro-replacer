@@ -75,7 +75,7 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 			errLabel.SetText(fmt.Sprintf("MakroCollection.Dat: załadowano %d mapowań", len(collection)))
 			errLabel.Importance = widget.MediumImportance
 			errLabel.Refresh()
-			a.Preferences().SetString("makroCollection", inputPath)
+			a.Preferences().SetString("makroCollectionPath", inputPath)
 		}
 
 	}
