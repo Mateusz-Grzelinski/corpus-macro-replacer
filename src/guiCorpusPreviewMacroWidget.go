@@ -211,7 +211,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	{
 		var renamed *string = nil
 		for i, changeEntry := range MacrosToChangeNamesEntries {
-			if changeEntry.Text == oldMakro.MakroName {
+			if MacrosToChangeReNamesEntriesBool[i].Checked && changeEntry.Text == oldMakro.MakroName {
 				renamed = &MacrosToChangeReNamesEntries[i].Text
 			}
 		}

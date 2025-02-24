@@ -53,6 +53,7 @@ var ListOfLoadedFilesContainer *fyne.Container
 var MacrosToChangeEntries []*widget.Entry
 var MacrosToChangeNamesEntries []*widget.Entry
 var MacrosToChangeReNamesEntries []*widget.Entry
+var MacrosToChangeReNamesEntriesBool []*widget.Check
 var AddMakroButton *widget.Button
 var DialogSizeDefault fyne.Size = fyne.NewSize(950, 650)
 
@@ -277,6 +278,22 @@ func RemoveEntry(slice []*widget.Entry, item *widget.Entry) []*widget.Entry {
 	return slice
 }
 
+// todo: use generics?
+func RemoveCheck(slice []*widget.Check, item *widget.Check) []*widget.Check {
+	for i, o := range slice {
+		if o != item {
+			continue
+		}
+
+		removed := make([]*widget.Check, len(slice)-1)
+		copy(removed, slice[:i])
+		copy(removed[i:], slice[i+1:])
+
+		return removed
+	}
+	return slice
+}
+
 func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 	macrosToChangeContainer := container.NewVBox()
 
@@ -348,6 +365,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 		}
 		MacrosToChangeEntries = append(MacrosToChangeEntries, newMacroPathEntry)                  // save to global var
 		MacrosToChangeNamesEntries = append(MacrosToChangeNamesEntries, newMacroNameEntry)        // save global var
+		MacrosToChangeReNamesEntriesBool = append(MacrosToChangeReNamesEntriesBool, renameBool)   // save global var
 		MacrosToChangeReNamesEntries = append(MacrosToChangeReNamesEntries, renameMacroNameEntry) // save global var
 		var row *fyne.Container
 		row = container.NewBorder(
@@ -390,6 +408,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 					macrosToChangeContainer.Remove(row)
 					MacrosToChangeNamesEntries = RemoveEntry(MacrosToChangeNamesEntries, newMacroNameEntry)
+					MacrosToChangeReNamesEntriesBool = RemoveCheck(MacrosToChangeReNamesEntriesBool, renameBool)
 					MacrosToChangeReNamesEntries = RemoveEntry(MacrosToChangeReNamesEntries, renameMacroNameEntry)
 					MacrosToChangeEntries = RemoveEntry(MacrosToChangeEntries, newMacroPathEntry)
 					macrosToChangeContainer.Refresh()

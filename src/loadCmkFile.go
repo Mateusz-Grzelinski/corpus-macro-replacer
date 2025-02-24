@@ -147,7 +147,11 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 		for _, macro := range resolveSubMakros {
 			for i, submacro := range macro.Makro {
 				if submacro.EmbeddedMakroName != "" && submacro.MAK == nil {
-					macro.Makro[i].MAK = resolveSubMakros[submacro.EmbeddedMakroName]
+					// make a copy just to be sure, probably can be optimized
+					var macroCopy = *resolveSubMakros[submacro.EmbeddedMakroName]
+					// embedded makro should get variables from parent, leaving any data here causes bugs
+					macroCopy.Varijable.DAT = ""
+					macro.Makro[i].MAK = &macroCopy
 					continueLoop = true
 				}
 			}
@@ -158,6 +162,9 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 	for _, macro := range resolveSubMakros {
 		for _, submacro := range macro.Makro {
 			if submacro.MAK == nil && submacro.EmbeddedMakroName != "" {
+				return nil, fmt.Errorf("ERROR: Makro '%s' not loaded properly! This might be a bug", submacro.EmbeddedMakroName)
+			}
+			if submacro.MAK.Varijable.DAT != "" {
 				return nil, fmt.Errorf("ERROR: Makro '%s' not loaded properly! This might be a bug", submacro.EmbeddedMakroName)
 			}
 		}

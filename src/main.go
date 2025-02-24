@@ -59,9 +59,15 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 				skippedDaske[daskeName]++
 				continue
 			}
-			renameTo := makroRename[oldMakro.MakroName]
+			renameMakro, found := makroRename[oldMakro.MakroName]
+			var renameTo *string
+			if !found {
+				renameTo = nil
+			} else {
+				renameTo = &renameMakro
+			}
 			newMakroCopyUntilIFixTheUpdateMakro := *newMakro
-			UpdateMakro(&oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, &renameTo, alwaysConvertLocalToGlobal)
+			UpdateMakro(&oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, renameTo, alwaysConvertLocalToGlobal)
 			element.Elinks.Spoj[i].Makro1 = newMakroCopyUntilIFixTheUpdateMakro
 			// spoj.Makro1 = *newMakro
 

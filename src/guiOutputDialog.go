@@ -202,7 +202,7 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 							macrosToRename := map[string]string{}
 							for i, e := range MacrosToChangeEntries {
 								macrosTochange = append(macrosTochange, e.Text)
-								if !e.Disabled() {
+								if MacrosToChangeReNamesEntriesBool[i].Checked {
 									macrosToRename[MacrosToChangeNamesEntries[i].Text] = MacrosToChangeReNamesEntries[i].Text
 								}
 							}
