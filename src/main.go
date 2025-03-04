@@ -115,8 +115,9 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 		return rootCorpusFile
 	}
 
-	ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
-	return nil
+	err = ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
+	log.Print(err)
+	return err
 }
 
 func FindCorpusFiles(inputFolder string) []string {

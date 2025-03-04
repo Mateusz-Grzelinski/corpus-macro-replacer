@@ -20,6 +20,25 @@ func (tr TrimmerDecoder) Token() (xml.Token, error) {
 	return t, err
 }
 
+/* converts Spoj to MakLink inplace */
+func CorpusVersion17To16(elements []Element) error {
+	for i := range elements {
+		el := elements[i]
+		for m := range el.Elinks.MakLink {
+			spoj, err := NewSpoj(&el.Elinks.MakLink[m])
+			if err != nil {
+				return fmt.Errorf("Error converting Spoj to MakLink: %w", err)
+			}
+			elements[i].Elinks.Spoj = append(elements[i].Elinks.Spoj, *spoj)
+		}
+	}
+	return nil
+}
+
+func isSupportedVersion(version string) bool {
+	return version == "16" || version == "17"
+}
+
 // normal idiomatic way of reading corpus file
 func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 	log.Printf("Reading Corpus file: '%s'", inputFile)
@@ -50,9 +69,11 @@ func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 				if err != nil {
 					return nil, nil, err
 				}
-				if root.VER.Value != "16" {
+				if !isSupportedVersion(root.VER.Value) {
 					return nil, nil, fmt.Errorf("unsupported corpus file version: %s", root.VER.Value)
-					// todo convert MakLink to Spoj
+				}
+				if root.VER.Value == "17" {
+					CorpusVersion17To16(root.Element)
 				}
 				return root, nil, nil
 			} else if t.Name.Local == "ELEMENTFILE" {
@@ -63,9 +84,11 @@ func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 				if err != nil {
 					return nil, nil, err
 				}
-				if root.VER.Value != "16" {
+				if !isSupportedVersion(root.VER.Value) {
 					return nil, nil, fmt.Errorf("unsupported corpus file version: %s", root.VER.Value)
-					// todo convert MakLink to Spoj
+				}
+				if root.VER.Value == "17" {
+					CorpusVersion17To16(root.Element)
 				}
 				return nil, root, nil
 			}
@@ -113,14 +136,16 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
 				handleOut := handleS3DFile(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {
-						log.Fatal(err)
+						log.Print(err)
+						return err
 					}
 				}
 			} else if t.Name.Local == "ELEMENTFILE" {
 				handleOut := handleE3DFile(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {
-						log.Fatal(err)
+						log.Print(err)
+						return err
 					}
 				}
 			} else {
@@ -146,6 +171,6 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
 	defer output.Close()
 
 	output.Write(encodedData.Bytes())
-	log.Printf("Done writing file  : '%s'", outputFile)
+	log.Printf("Done writing file: '%s'", outputFile)
 	return nil
 }

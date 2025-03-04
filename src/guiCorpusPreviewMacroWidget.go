@@ -240,7 +240,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 		mc.contentDiff.Objects[0] = NewHSplitFromCMK(oldRichText, newRichText)
 	}
 	if oldMakro.Joint != nil || newMakro.Joint != nil {
-		newRichText := NewRichTextFromCMK("[JOINT]\n// zawsze wczytane z Corpusa\n", newMakro.Joint)
+		newRichText := NewRichTextFromCMK("[JOINT]\n// sekcja JOINT nigdy nie jest aktualizowana\n", oldMakro.Joint)
 		oldRichText := NewRichTextFromCMK("[JOINT]\n\n", oldMakro.Joint)
 		mc.contentDiff.Objects[1] = NewHSplitFromCMK(oldRichText, newRichText)
 	}
@@ -255,27 +255,27 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 		pocketVBox := mc.contentDiff.Objects[3].(*fyne.Container)
 		pocketVBox.RemoveAll()
 		for i, item := range newMakro.Pocket {
-			pocketVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[POCKET%d]\nWczytane z pliku .CMK\n", i), &item))
+			pocketVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[POCKET%d]\n// Wczytane z pliku .CMK\n", i), &item))
 		}
 		potrosniVBox := mc.contentDiff.Objects[4].(*fyne.Container)
 		potrosniVBox.RemoveAll()
 		for i, item := range newMakro.Potrosni {
-			potrosniVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[POTROSNI%d]\nWczytane z pliku .CMK\n", i), &item))
+			potrosniVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[POTROSNI%d]\n// Wczytane z pliku .CMK\n", i), &item))
 		}
 		grupaVBox := mc.contentDiff.Objects[5].(*fyne.Container)
 		grupaVBox.RemoveAll()
 		for i, item := range newMakro.Grupa {
-			grupaVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[GRUPA%d]\nWczytane z pliku .CMK\n", i), &item))
+			grupaVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[GRUPA%d]\n// Wczytane z pliku .CMK\n", i), &item))
 		}
 		rasterVBox := mc.contentDiff.Objects[6].(*fyne.Container)
 		rasterVBox.RemoveAll()
 		for i, item := range newMakro.Raster {
-			rasterVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[RASTER%d]\nWczytane z pliku .CMK\n", i), &item))
+			rasterVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[RASTER%d]\n// Wczytane z pliku .CMK\n", i), &item))
 		}
 		makroVBox := mc.contentDiff.Objects[7].(*fyne.Container)
 		makroVBox.RemoveAll()
 		for i, item := range newMakro.Makro {
-			makroVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[MAKRO%d]\nWczytane z pliku .CMK\n", i), &item.GenericNodeWithDat))
+			makroVBox.Add(NewRichTextFromCMK(fmt.Sprintf("[MAKRO%d]\n// Wczytane z pliku .CMK\n", i), &item.GenericNodeWithDat))
 		}
 
 		mc.contentDiff.Objects[8] = widget.NewButtonWithIcon("Zwiń", theme.VisibilityOffIcon(), func() {

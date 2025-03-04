@@ -16,15 +16,25 @@ var testFilesE3D = []string{
 	"simple_in_simple_in_simple.E3D",
 }
 
-func TestLoadCorpusE3DFileVersion16(t *testing.T) {
+func TestLoadAndSaveCorpusE3DFileVersion16To16(t *testing.T) {
 	for _, testFile := range testFilesE3D {
 		simple_path := filepath.Join(pathToE3DTestDataVertsion16, testFile)
 		_, _, err := NewCorpusFile(simple_path)
 		if err != nil {
+			t.Logf("Error loading file %s", testFile)
 			t.Error(err)
 			t.FailNow()
-			// t.Log(elementFile)
 		}
+
+		// todo how to test encoding?
+		// var encodedData bytes.Buffer
+		// encoder := xml.NewEncoder(&encodedData)
+		// err = encoder.Encode(projectFile)
+		// if err != nil {
+		// 	t.Logf("Error saving (encoding) file %s", testFile)
+		// 	t.Error(err)
+		// 	t.FailNow()
+		// }
 	}
 }
 func TestLoadCorpusE3DFileVersion17(t *testing.T) {
@@ -32,6 +42,7 @@ func TestLoadCorpusE3DFileVersion17(t *testing.T) {
 		simple_path := filepath.Join(pathToE3DTestDataVertsion17, testFile)
 		_, _, err := NewCorpusFile(simple_path)
 		if err != nil {
+			t.Logf("Error loading file %s", testFile)
 			t.Error(err)
 			t.FailNow()
 			// t.Log(elementFile)

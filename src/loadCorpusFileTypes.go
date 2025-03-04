@@ -21,16 +21,31 @@ type GenericNode struct {
 
 // E3D file
 type ElementFile struct {
-	XMLName xml.Name `xml:"ELEMENTFILE"`
+	// XMLName xml.Name `xml:"ELEMENTFILE"`
 	GenericNode
 	FILE    xml.Attr  `xml:"FILE,attr"`
 	VER     xml.Attr  `xml:"VER,attr"`
 	Element []Element `xml:"ELEMENT"`
 }
 
+// does nothing special, only fill in data for children
+func (ef *ElementFile) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type Alias ElementFile
+	temp := &struct{ *Alias }{Alias: (*Alias)(ef)}
+
+	if err := d.DecodeElement(&temp, &start); err != nil {
+		return err
+	}
+	ef = (*ElementFile)(temp.Alias)
+	for i := range ef.Element {
+		ef.Element[i].Elinks.EncodeVersion = ef.VER.Value
+	}
+	return nil
+}
+
 // S3D file
 type ProjectFile struct {
-	XMLName xml.Name `xml:"PROJECTFILE"`
+	// XMLName xml.Name `xml:"PROJECTFILE"`
 	ElementFile
 }
 
@@ -65,12 +80,38 @@ type AD struct {
 }
 
 type Elinks struct {
+	EncodeVersion string `xml:"-"`
 	GenericNode
 	COUNT xml.Attr `xml:"COUNT,attr"`
 	// version 16
 	Spoj []Spoj `xml:"SPOJ"`
 	// version 17
 	MakLink []MakLink `xml:"MAKLINK"`
+}
+
+// encode
+func (elink *Elinks) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	// Start the main element
+	var elinkCopy Elinks = *elink
+
+	// 16 is our default version
+	if elinkCopy.EncodeVersion == "16" || elinkCopy.EncodeVersion == "" {
+		elinkCopy.MakLink = []MakLink{}
+		if err := e.EncodeElement(elinkCopy, start); err != nil {
+			return err
+		}
+	} else if elinkCopy.EncodeVersion == "17" {
+		elinkCopy.Spoj = []Spoj{}
+		if err := e.EncodeElement(elinkCopy, start); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("saving to unsupported version: %s", elinkCopy.EncodeVersion)
+	}
+
+	// Close the CustomElement tag
+	// return e.EncodeToken(start.End())
+	return nil
 }
 
 // version 17
@@ -87,20 +128,20 @@ type MakLink struct {
 	MM2 GenericNode `xml:"MM2"`
 }
 
-func NewSpoj(makLink *MakLink) (*Spoj, error) {
-	spoj := Spoj{}
-	spoj.GenericNode = makLink.GenericNode
-	spoj.O1.Value = makLink.OB1.Value
-	spoj.O2.Value = makLink.OB2.Value
-	spoj.SP.Value = makLink.CSP.Value
-	makNew, err := NewM1(&makLink.MM1)
+func NewMakLink(spoj *Spoj) (*MakLink, error) {
+	makLink := MakLink{}
+	makLink.GenericNode = spoj.GenericNode
+	makLink.OB1.Value = spoj.O1.Value
+	makLink.OB2.Value = spoj.O2.Value
+	makLink.CSP.Value = spoj.SP.Value
+	makNew, err := NewMM1(&spoj.Makro1)
 	if err != nil {
 		return nil, err
 	}
-	spoj.Makro1 = *makNew
-	// todo M2 not supported...
-	spoj.Makro2 = GenericNode{}
-	return &spoj, nil
+	makLink.MM1 = *makNew
+	// todo MM2 not supported...
+	makLink.MM2 = spoj.Makro2
+	return &makLink, nil
 }
 
 // version 16
@@ -117,6 +158,24 @@ type Spoj struct {
 	Makro2 GenericNode `xml:"M2"`
 }
 
+// used for version conversion: 17 -> 16
+// version 16 scheme is treated as source of truth
+func NewSpoj(makLink *MakLink) (*Spoj, error) {
+	spoj := Spoj{}
+	spoj.GenericNode = makLink.GenericNode
+	spoj.O1.Value = makLink.OB1.Value
+	spoj.O2.Value = makLink.OB2.Value
+	spoj.SP.Value = makLink.CSP.Value
+	makNew, err := NewM1(&makLink.MM1)
+	if err != nil {
+		return nil, err
+	}
+	spoj.Makro1 = *makNew
+	// todo M2 not supported...
+	spoj.Makro2 = GenericNode{}
+	return &spoj, nil
+}
+
 type GenericNodeWithDat struct { // Varijable
 	GenericNode
 	DAT string `xml:"DAT,attr"`
@@ -125,6 +184,8 @@ type GenericNodeWithDat struct { // Varijable
 // version 17
 type GenericNodeWithC6Dat struct { // Varijable
 	GenericNodeWithDat
+	// explicitely ignore DAT, they usually do not occur together
+	DAT   string `xml:"DAT,attr,omitempty"`
 	C6DAT string `xml:"C6DAT,attr"`
 }
 
@@ -151,6 +212,21 @@ func (gn *GenericNodeWithC6Dat) DecodeC6Dat() (string, error) {
 	return output.String(), nil
 }
 
+func EncodeC6Dat(input string) (*string, error) {
+	// Compress using zlib
+	var compressed bytes.Buffer
+	writer := zlib.NewWriter(&compressed)
+	_, err := writer.Write([]byte(input))
+	if err != nil {
+		return nil, err
+	}
+	writer.Close()
+
+	// Encode to base64
+	C6DAT := base64.StdEncoding.EncodeToString(compressed.Bytes())
+	return &C6DAT, nil
+}
+
 // version 16
 type M1EmbeddedMakro struct {
 	GenericNodeWithDat
@@ -165,6 +241,7 @@ type MM1EmbeddedMakro struct {
 	MAK                *MM1   `xml:"MAK,omitempty"`
 }
 
+// version 17 -> 16
 func NewM1EmbeddedMakro(mm1EmbeddedMakro *MM1EmbeddedMakro) (*M1EmbeddedMakro, error) {
 	m1 := M1EmbeddedMakro{}
 	m1.Attr = mm1EmbeddedMakro.Attr
@@ -180,6 +257,24 @@ func NewM1EmbeddedMakro(mm1EmbeddedMakro *MM1EmbeddedMakro) (*M1EmbeddedMakro, e
 		m1.MAK = mak
 	}
 	return &m1, nil
+}
+
+// version 16 -> 17
+func NewMM1EmbeddedMakro(m1EmbeddedMakro *M1EmbeddedMakro) (*MM1EmbeddedMakro, error) {
+	mm1 := MM1EmbeddedMakro{}
+	mm1.Attr = m1EmbeddedMakro.Attr
+	mm1.DAT = m1EmbeddedMakro.DAT
+	mm1.Content = m1EmbeddedMakro.Content
+	mm1.Chardata = m1EmbeddedMakro.Chardata
+	mm1.EmbeddedMakroName = m1EmbeddedMakro.EmbeddedMakroName
+	if m1EmbeddedMakro.MAK != nil {
+		mak, err := NewMM1(m1EmbeddedMakro.MAK)
+		if err != nil {
+			return nil, err
+		}
+		mm1.MAK = mak
+	}
+	return &mm1, nil
 }
 
 // extracts name of submacro that is used in Corpus call in [MAKRO] section
@@ -247,7 +342,7 @@ type MM1 struct {
 	Makro     []MM1EmbeddedMakro     `xml:"MSMA,omitempty"`
 }
 
-// decoding version 17
+// decoding version 17 -> 16
 func NewM1(mm1 *MM1) (*M1, error) {
 	m1 := M1{
 		GenericNode: mm1.GenericNode,
@@ -302,7 +397,7 @@ func NewM1(mm1 *MM1) (*M1, error) {
 		if err != nil {
 			return nil, err
 		}
-		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Potrosni[i].GenericNode = encodedItem.GenericNode
 		m1.Potrosni[i].DAT = decoded
 	}
 
@@ -312,7 +407,7 @@ func NewM1(mm1 *MM1) (*M1, error) {
 		if err != nil {
 			return nil, err
 		}
-		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Pocket[i].GenericNode = encodedItem.GenericNode
 		m1.Pocket[i].DAT = decoded
 	}
 
@@ -322,7 +417,7 @@ func NewM1(mm1 *MM1) (*M1, error) {
 		if err != nil {
 			return nil, err
 		}
-		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Raster[i].GenericNode = encodedItem.GenericNode
 		m1.Raster[i].DAT = decoded
 	}
 
@@ -337,6 +432,98 @@ func NewM1(mm1 *MM1) (*M1, error) {
 	}
 
 	return &m1, nil
+}
+
+// decoding version 16 -> 17
+func NewMM1(m1 *M1) (*MM1, error) {
+	mm1 := MM1{
+		GenericNode: m1.GenericNode,
+		MakroName:   m1.MakroName,
+	}
+	{
+		encoded, err := EncodeC6Dat(m1.Varijable.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Varijable = GenericNodeWithC6Dat{GenericNodeWithDat: m1.Varijable, C6DAT: *encoded}
+		mm1.Varijable.DAT = ""
+	}
+
+	if m1.Formule != nil {
+		encoded, err := EncodeC6Dat(m1.Formule.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Formule = &GenericNodeWithC6Dat{GenericNodeWithDat: *m1.Formule, C6DAT: *encoded}
+	}
+
+	mm1.Pila = make([]GenericNodeWithC6Dat, len(m1.Pila))
+	for i, pilaEncoded := range m1.Pila {
+		encoded, err := EncodeC6Dat(pilaEncoded.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Pila[i].DAT = *encoded
+	}
+
+	if m1.Joint != nil {
+		encoded, err := EncodeC6Dat(m1.Joint.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Joint = &GenericNodeWithC6Dat{GenericNodeWithDat: *m1.Joint, C6DAT: *encoded}
+	}
+
+	mm1.Grupa = make([]GenericNodeWithC6Dat, len(m1.Grupa))
+	for i, encodedItem := range m1.Grupa {
+		encoded, err := EncodeC6Dat(encodedItem.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Grupa[i].GenericNode = encodedItem.GenericNode
+		mm1.Grupa[i].DAT = *encoded
+	}
+
+	mm1.Potrosni = make([]GenericNodeWithC6Dat, len(m1.Potrosni))
+	for i, encodedItem := range m1.Potrosni {
+		encoded, err := EncodeC6Dat(encodedItem.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Potrosni[i].GenericNode = encodedItem.GenericNode
+		mm1.Potrosni[i].DAT = *encoded
+	}
+
+	mm1.Pocket = make([]GenericNodeWithC6Dat, len(m1.Pocket))
+	for i, encodedItem := range m1.Pocket {
+		encoded, err := EncodeC6Dat(encodedItem.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Pocket[i].GenericNode = encodedItem.GenericNode
+		mm1.Pocket[i].DAT = *encoded
+	}
+
+	mm1.Raster = make([]GenericNodeWithC6Dat, len(m1.Raster))
+	for i, encodedItem := range m1.Raster {
+		encoded, err := EncodeC6Dat(encodedItem.DAT)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Raster[i].GenericNode = encodedItem.GenericNode
+		mm1.Raster[i].DAT = *encoded
+	}
+
+	mm1.Makro = make([]MM1EmbeddedMakro, len(m1.Makro))
+	for i, m1EmbeddedMakro := range m1.Makro {
+		embedded, err := NewMM1EmbeddedMakro(&m1EmbeddedMakro)
+		if err != nil {
+			return nil, err
+		}
+		mm1.Makro[i] = *embedded
+	}
+
+	return &mm1, nil
 }
 
 // save makro as CMK file
