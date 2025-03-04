@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
+	"compress/zlib"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"strings"
 )
 
@@ -57,13 +58,52 @@ type Daske struct {
 // plank
 type AD struct {
 	GenericNode
-	DName xml.Attr `xml:"DNAME,attr"`
+	Potrosni GenericNode `xml:"POTROSNI"`
+	// curves
+	Krivulje GenericNode `xml:"KRIVULJE"`
+	DName    xml.Attr    `xml:"DNAME,attr"`
 }
+
 type Elinks struct {
 	GenericNode
 	COUNT xml.Attr `xml:"COUNT,attr"`
-	Spoj  []Spoj   `xml:"SPOJ"`
+	// version 16
+	Spoj []Spoj `xml:"SPOJ"`
+	// version 17
+	MakLink []MakLink `xml:"MAKLINK"`
 }
+
+// version 17
+type MakLink struct {
+	GenericNode
+	/* index of: element.Daske.AD[O1] */
+	OB1 xml.Attr `xml:"OB1,attr"`
+	OB2 xml.Attr `xml:"OB2,attr"`
+	CSP xml.Attr `xml:"CSP,attr"`
+	/* unknown */
+	SP  xml.Attr `xml:"SP,attr"`
+	MM1 MM1      `xml:"MM1"`
+	/* unknown, M2 seems to be unused */
+	MM2 GenericNode `xml:"MM2"`
+}
+
+func NewSpoj(makLink *MakLink) (*Spoj, error) {
+	spoj := Spoj{}
+	spoj.GenericNode = makLink.GenericNode
+	spoj.O1.Value = makLink.OB1.Value
+	spoj.O2.Value = makLink.OB2.Value
+	spoj.SP.Value = makLink.CSP.Value
+	makNew, err := NewM1(&makLink.MM1)
+	if err != nil {
+		return nil, err
+	}
+	spoj.Makro1 = *makNew
+	// todo M2 not supported...
+	spoj.Makro2 = GenericNode{}
+	return &spoj, nil
+}
+
+// version 16
 type Spoj struct {
 	GenericNode
 	/* index of: element.Daske.AD[O1] */
@@ -80,19 +120,70 @@ type Spoj struct {
 type GenericNodeWithDat struct { // Varijable
 	GenericNode
 	DAT string `xml:"DAT,attr"`
-	// Attr string `xml:",any,attr"`
 }
 
-type EmbeddedMakro struct {
-	// GenericNode
+// version 17
+type GenericNodeWithC6Dat struct { // Varijable
+	GenericNodeWithDat
+	C6DAT string `xml:"C6DAT,attr"`
+}
+
+func (gn *GenericNodeWithC6Dat) DecodeC6Dat() (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(gn.C6DAT)
+	if err != nil {
+		return "", err
+	}
+
+	// Decompress using zlib
+	reader, err := zlib.NewReader(bytes.NewReader(decoded))
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	// Read decompressed data
+	var output bytes.Buffer
+	_, err = io.Copy(&output, reader)
+	if err != nil {
+		return "", err
+	}
+
+	return output.String(), nil
+}
+
+// version 16
+type M1EmbeddedMakro struct {
 	GenericNodeWithDat
 	EmbeddedMakroName string `xml:"-"`
-	// DAT               string `xml:"DAT,attr"`
-	MAK *M1 `xml:"MAK,omitempty"`
+	MAK               *M1    `xml:"MAK,omitempty"`
+}
+
+// version 17
+type MM1EmbeddedMakro struct {
+	GenericNodeWithDat        // lol, still uses DAT, not C6DAT
+	EmbeddedMakroName  string `xml:"-"`
+	MAK                *MM1   `xml:"MAK,omitempty"`
+}
+
+func NewM1EmbeddedMakro(mm1EmbeddedMakro *MM1EmbeddedMakro) (*M1EmbeddedMakro, error) {
+	m1 := M1EmbeddedMakro{}
+	m1.Attr = mm1EmbeddedMakro.Attr
+	m1.DAT = mm1EmbeddedMakro.DAT
+	m1.Content = mm1EmbeddedMakro.Content
+	m1.Chardata = mm1EmbeddedMakro.Chardata
+	m1.EmbeddedMakroName = mm1EmbeddedMakro.EmbeddedMakroName
+	if mm1EmbeddedMakro.MAK != nil {
+		mak, err := NewM1(mm1EmbeddedMakro.MAK)
+		if err != nil {
+			return nil, err
+		}
+		m1.MAK = mak
+	}
+	return &m1, nil
 }
 
 // extracts name of submacro that is used in Corpus call in [MAKRO] section
-func (em *EmbeddedMakro) CalledWith() string {
+func (em *M1EmbeddedMakro) CalledWith() string {
 	for _, line := range decodeAllCMKLines(em.DAT) {
 		nameAndValue := strings.SplitN(line, "=", 2)
 		if strings.ToLower(nameAndValue[0]) == "name" {
@@ -122,6 +213,8 @@ Example value:
 			<MSJO DAT="CONNECT=2345,mindistance=-16,maxdistance=10"></MSJO>
 		</M1>
 	}
+
+version 16
 */
 type M1 struct {
 	GenericNode
@@ -135,11 +228,115 @@ type M1 struct {
 	Potrosni  []GenericNodeWithDat `xml:"MSPO,omitempty"`
 	Pocket    []GenericNodeWithDat `xml:"MSPOCK,omitempty"`
 	Raster    []GenericNodeWithDat `xml:"MSRA,omitempty"`
-	Makro     []EmbeddedMakro      `xml:"MSMA,omitempty"`
+	Makro     []M1EmbeddedMakro    `xml:"MSMA,omitempty"`
 }
 
-type TrimmerDecoder struct {
-	decoder *xml.Decoder
+// version 17
+type MM1 struct {
+	GenericNode
+	/* MN is not obligatory. Empty names means that makro is not save in any file. */
+	MakroName string                 `xml:"MN,attr"`
+	Varijable GenericNodeWithC6Dat   `xml:"MSVA"`
+	Formule   *GenericNodeWithC6Dat  `xml:"MSFO,omitempty"`
+	Pila      []GenericNodeWithC6Dat `xml:"MSPI,omitempty"`
+	Joint     *GenericNodeWithC6Dat  `xml:"MSJO,omitempty"`
+	Grupa     []GenericNodeWithC6Dat `xml:"MSGR,omitempty"`
+	Potrosni  []GenericNodeWithC6Dat `xml:"MSPO,omitempty"`
+	Pocket    []GenericNodeWithC6Dat `xml:"MSPOCK,omitempty"`
+	Raster    []GenericNodeWithC6Dat `xml:"MSRA,omitempty"`
+	Makro     []MM1EmbeddedMakro     `xml:"MSMA,omitempty"`
+}
+
+// decoding version 17
+func NewM1(mm1 *MM1) (*M1, error) {
+	m1 := M1{
+		GenericNode: mm1.GenericNode,
+		MakroName:   mm1.MakroName,
+	}
+	{
+		decoded, err := mm1.Varijable.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Varijable = GenericNodeWithDat{GenericNode: mm1.Varijable.GenericNode, DAT: decoded}
+	}
+
+	if mm1.Formule != nil {
+		decoded, err := mm1.Formule.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Formule = &GenericNodeWithDat{GenericNode: mm1.Formule.GenericNode, DAT: decoded}
+	}
+
+	m1.Pila = make([]GenericNodeWithDat, len(mm1.Pila))
+	for i, pilaEncoded := range mm1.Pila {
+		decoded, err := pilaEncoded.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Pila[i].DAT = decoded
+	}
+
+	if mm1.Joint != nil {
+		decoded, err := mm1.Joint.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Joint = &GenericNodeWithDat{GenericNode: mm1.Joint.GenericNode, DAT: decoded}
+	}
+
+	m1.Grupa = make([]GenericNodeWithDat, len(mm1.Grupa))
+	for i, encodedItem := range mm1.Grupa {
+		decoded, err := encodedItem.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Grupa[i].DAT = decoded
+	}
+
+	m1.Potrosni = make([]GenericNodeWithDat, len(mm1.Potrosni))
+	for i, encodedItem := range mm1.Potrosni {
+		decoded, err := encodedItem.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Potrosni[i].DAT = decoded
+	}
+
+	m1.Pocket = make([]GenericNodeWithDat, len(mm1.Pocket))
+	for i, encodedItem := range mm1.Pocket {
+		decoded, err := encodedItem.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Pocket[i].DAT = decoded
+	}
+
+	m1.Raster = make([]GenericNodeWithDat, len(mm1.Raster))
+	for i, encodedItem := range mm1.Raster {
+		decoded, err := encodedItem.DecodeC6Dat()
+		if err != nil {
+			return nil, err
+		}
+		m1.Grupa[i].GenericNode = encodedItem.GenericNode
+		m1.Raster[i].DAT = decoded
+	}
+
+	m1.Makro = make([]M1EmbeddedMakro, len(mm1.Makro))
+	for i, mm1EmbeddedMakro := range mm1.Makro {
+		// decoded, err := encodedItem.DecodeC6Dat()
+		embedded, err := NewM1EmbeddedMakro(&mm1EmbeddedMakro)
+		if err != nil {
+			return nil, err
+		}
+		m1.Makro[i] = *embedded
+	}
+
+	return &m1, nil
 }
 
 // save makro as CMK file
@@ -240,12 +437,12 @@ func (e *Element) VisitElementsAndSubelements(f func(*Element)) {
 }
 
 // visit self and submakros
-func (m *M1) VisitSubmakros(f func(parent *M1, embededParent *EmbeddedMakro, child *EmbeddedMakro)) {
+func (m *M1) VisitSubmakros(f func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro)) {
 	f(m, nil, nil) // entrypoiny
 	m.partialVisitSubmakros(nil, f)
 }
 
-func (m *M1) partialVisitSubmakros(embededParent *EmbeddedMakro, f func(parent *M1, embededParent *EmbeddedMakro, child *EmbeddedMakro)) {
+func (m *M1) partialVisitSubmakros(embededParent *M1EmbeddedMakro, f func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro)) {
 	for _, submacro := range m.Makro {
 		f(m, embededParent, &submacro)
 		submacro.MAK.partialVisitSubmakros(&submacro, f)
@@ -256,133 +453,3 @@ func (m *M1) partialVisitSubmakros(embededParent *EmbeddedMakro, f func(parent *
 // func (em *EmbeddedMakro) VisitSubmakros(f func(parent *M1, child *EmbeddedMakro)) {
 // 	em.MAK.VisitSubmakros(f)
 // }
-
-func (tr TrimmerDecoder) Token() (xml.Token, error) {
-	t, err := tr.decoder.Token()
-	if cd, ok := t.(xml.CharData); ok {
-		t = xml.CharData(bytes.TrimSpace(cd))
-	}
-	return t, err
-}
-
-// normal idiomatic way of reading corpus file
-func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
-	log.Printf("Reading Corpus file: '%s'", inputFile)
-	input, err := os.Open(inputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error opening input file: %w", err)
-	}
-	defer input.Close()
-
-	rawDecoder := xml.NewDecoder(input)
-	decoder := xml.NewTokenDecoder(TrimmerDecoder{rawDecoder})
-	for {
-		token, err := decoder.Token()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return nil, nil, fmt.Errorf("error decoding XML: %w", err)
-		}
-
-		switch t := token.(type) {
-		case xml.StartElement:
-			if t.Name.Local == "PROJECTFILE" {
-				var root *ProjectFile = new(ProjectFile)
-				decoder.Strict = true
-				err := decoder.DecodeElement(&root, &t)
-				decoder.Strict = false
-				if err != nil {
-					return nil, nil, err
-				}
-				return root, nil, nil
-			} else if t.Name.Local == "ELEMENTFILE" {
-				var root *ElementFile = new(ElementFile)
-				decoder.Strict = true
-				err := decoder.DecodeElement(&root, &t)
-				decoder.Strict = false
-				if err != nil {
-					return nil, nil, err
-				}
-				return nil, root, nil
-			}
-		default:
-		}
-	}
-	return nil, nil, fmt.Errorf("something went wrong when reading corpus file. Wrong file format?")
-}
-
-// goes via file token by token thus has better chance of being correct
-func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
-	handleE3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
-	handleS3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
-) error {
-	log.Printf("Reading Corpus file: '%s'", inputFile)
-	input, err := os.Open(inputFile)
-	if err != nil {
-		return fmt.Errorf("error opening input file: %w", err)
-	}
-	defer input.Close()
-
-	var encodedData bytes.Buffer
-	rawDecoder := xml.NewDecoder(input)
-	decoder := xml.NewTokenDecoder(TrimmerDecoder{rawDecoder})
-	encoder := xml.NewEncoder(&encodedData)
-	// indentation is actually considered xml.CharData, so pretty printing is actually modifying it
-	if !minify {
-		encoder.Indent("", "  ")
-	} else {
-		encoder.Indent("", "")
-	}
-
-	for {
-		token, err := decoder.Token()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return fmt.Errorf("error decoding XML: %w", err)
-		}
-
-		switch t := token.(type) {
-		case xml.StartElement:
-			if t.Name.Local == "PROJECTFILE" {
-				handleOut := handleS3DFile(decoder, t)
-				if handleOut != nil {
-					if err = encoder.Encode(handleOut); err != nil {
-						log.Fatal(err)
-					}
-				}
-			} else if t.Name.Local == "ELEMENTFILE" {
-				handleOut := handleE3DFile(decoder, t)
-				if handleOut != nil {
-					if err = encoder.Encode(handleOut); err != nil {
-						log.Fatal(err)
-					}
-				}
-			} else {
-				encoder.EncodeToken(t)
-			}
-		case xml.CharData:
-			encoder.EncodeToken(t)
-		case xml.Comment:
-			encoder.EncodeToken(t)
-		default:
-			encoder.EncodeToken(t)
-		}
-	}
-	err = encoder.Flush()
-	if err != nil {
-		return err
-	}
-
-	output, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("error creating output file: %w", err)
-	}
-	defer output.Close()
-
-	output.Write(encodedData.Bytes())
-	log.Printf("Done writing file  : '%s'", outputFile)
-	return nil
-}

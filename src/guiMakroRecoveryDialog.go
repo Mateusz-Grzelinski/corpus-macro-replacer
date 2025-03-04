@@ -67,7 +67,7 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 			// todo there is no way to break early the visit walk
 			elementFile.VisitElementsAndSubelements(func(e *Element) {
 				for _, s := range e.Elinks.Spoj {
-					s.Makro1.VisitSubmakros(func(parent *M1, embededParent *EmbeddedMakro, child *EmbeddedMakro) {
+					s.Makro1.VisitSubmakros(func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro) {
 						if !continueRecovery {
 							return // lame version of break early
 						}

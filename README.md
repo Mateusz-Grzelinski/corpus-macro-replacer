@@ -167,7 +167,8 @@ _grubosc=obj1.gr
 
 # Testing
 
-Tested manually using Corpus 5.0.
+Tested manually using Corpus 5.0 and Corpus 6.0 (file versions 16 and 17).
+There are basic automated tests in code.
 
 # License 
 

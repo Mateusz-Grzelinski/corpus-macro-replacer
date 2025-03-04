@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -77,6 +78,12 @@ type Spoj struct {
 	// M2
 }
 
+func handle(ctx context.Context, e *ElementFile) {
+	fmt.Println("handiling!")
+	ctx, cancelCtx := context.WithCancel(ctx)
+	cancelCtx()
+}
+
 func main() {
 	// Open the XML file
 	xmlFile, err := os.Open("lewy_gorny.E3D.xml")
@@ -111,23 +118,37 @@ func main() {
 		case xml.StartElement:
 			if t.Name.Local == "ELEMENTFILE" {
 				err := decoder.DecodeElement(&root, &t)
+				ctxB := context.Background()
+				ctx := context.WithValue(ctxB, "elementfile", &root)
+				// root.
+				// 	handle(ctx, &root)
+				select {
+				case <-ctx.Done():
+					if err := ctx.Err(); err != nil {
+						fmt.Printf("doAnother err: %s\n", err)
+					}
+					fmt.Printf("doAnother: finished\n")
+					// return
+					// case num := <-printCh:
+					// 	fmt.Printf("doAnother: %d\n", num)
+				}
 				if err != nil {
 					fmt.Println(err)
 				}
 				fmt.Println("root element", token)
 				encoder.Encode(&root)
 			}
-			fmt.Println("start element", token)
+			// fmt.Println("start element", token)
 			encoder.EncodeToken(t)
 		case xml.CharData:
 			charData := strings.TrimSpace(string(token.(xml.CharData)))
 			fmt.Printf("chardata! '%s'\n", charData)
 			encoder.EncodeToken(t)
 		case xml.Comment:
-			fmt.Println("comment!", token)
+			// fmt.Println("comment!", token)
 			encoder.EncodeToken(t)
 		default:
-			fmt.Println("default!", token)
+			// fmt.Println("default!", token)
 			encoder.EncodeToken(t)
 		}
 	}

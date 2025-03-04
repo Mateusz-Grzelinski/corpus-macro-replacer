@@ -59,9 +59,11 @@ func NewElementFileContainer(ef *ElementFile, compact bool, hideElementsWithZero
 func (mc *ElementFileContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(mc.content)
 }
+
 func ElementTotalNumOfMacros(element *Element) int {
 	return _elementTotalNumOfMacros(element, 0)
 }
+
 func _elementTotalNumOfMacros(element *Element, accumulate int) int {
 	numOfMacros := len(element.Elinks.Spoj) + accumulate
 	for _, elem := range element.ElmList.Elm {

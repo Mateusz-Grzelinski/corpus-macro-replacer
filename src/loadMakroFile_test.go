@@ -78,13 +78,15 @@ func checkMakroSimple(makro *M1, t *testing.T) {
 }
 
 func TestNewMakroFromCMKFileLoadMakroByNamedMakroBasicNameMapping(t *testing.T) {
-	makro, err := NewMakroFromCMKFile(nil,
-		filepath.Join(pathToCMKTestData, "loadMakroByNamedMakro.CMK"),
-		nil,
-		MakroMappings{"creative_user_wants_to_load_simple": filepath.Join(pathToCMKTestData, testFilesCMK[0])},
+	var makroName *string = nil
+	var makroFile string = filepath.Join(pathToCMKTestData, "loadMakroByNamedMakro.CMK")
+	makro, err := NewMakroFromCMKFile(makroName, makroFile, nil,
+		// makro mapping are relative to Makro folder, ex. The root path is `C:\Tri D Corpus\Corpus 6.0\Makro`, and the value is `./Sevroll Zawiasy/Flod_lewy.CMK`
+		MakroMappings{"creative_user_wants_to_load_simple": "simple.CMK"},
 	)
 	if err != nil {
 		t.Error(err)
+		t.FailNow()
 	}
 	if makro.MakroName != "loadMakroByNamedMakro" {
 		t.Errorf("makro name is bad: %s", makro.MakroName)

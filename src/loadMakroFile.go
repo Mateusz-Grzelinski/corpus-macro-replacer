@@ -48,7 +48,7 @@ func appendM1Section(m *M1, currentSection string, currentSectionTextBuilder str
 	case "pila":
 		m.Pila = append(m.Pila, GenericNodeWithDat{DAT: currentSectionText})
 	case "makro":
-		embeddedMakro := EmbeddedMakro{GenericNodeWithDat: GenericNodeWithDat{DAT: currentSectionText}, MAK: nil}
+		embeddedMakro := M1EmbeddedMakro{GenericNodeWithDat: GenericNodeWithDat{DAT: currentSectionText}, MAK: nil}
 		embeddedMakro.EmbeddedMakroName = embeddedMakro.CalledWith()
 		m.Makro = append(m.Makro, embeddedMakro)
 	default:
