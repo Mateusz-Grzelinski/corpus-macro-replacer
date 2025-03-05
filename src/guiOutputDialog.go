@@ -58,7 +58,7 @@ func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[st
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("panic occured: ", r)
-			*err = fmt.Sprintf("⚠ ERROR (panic): %s", inputFile)
+			*err = fmt.Sprintf("💀 FATAL: %s: %s", inputFile, r)
 		}
 	}()
 	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, makroRename, alwaysConvertLocalToGlobal, verbose, minify)
@@ -92,7 +92,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		return
 	}
 	panicErrors := []string{}
-	normalErrors := []error{}
+	normalErrors := []string{}
 	for i, inputFile := range foundCorpusFiles {
 		currentLog = append(currentLog, fmt.Sprintf("%d/%d: %s", i+1, len(foundCorpusFiles), inputFile))
 		relInputFile, _ := filepath.Rel(outputDir, inputFile)
@@ -102,11 +102,12 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, makroOldNameToNewName, panicErrorToReport, alwaysConvertLocalToGlobal, verbose, minify)
 		if *panicErrorToReport != "" {
 			panicErrors = append(panicErrors, *panicErrorToReport)
-			currentLog = append(currentLog, fmt.Sprintf("⚠ FATAL: '%s'", outputFile))
+			currentLog = append(currentLog, *panicErrorToReport)
 		}
 		if err != nil {
-			normalErrors = append(normalErrors, err)
-			currentLog = append(currentLog, fmt.Sprintf("⚠ ERROR: '%s' %s", outputFile, err))
+			normalErrorMessage := fmt.Sprintf("⚠ ERROR: '%s' %s", outputFile, err)
+			normalErrors = append(normalErrors, normalErrorMessage)
+			currentLog = append(currentLog, normalErrorMessage)
 		}
 		// _, err := io.Copy(&buf, r)
 		// fmt.Print(err)
@@ -120,10 +121,10 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 		log.Println(normalErrors)
 
 		currentLog = append(currentLog, message)
-		currentLog = append(currentLog, panicErrors...)
+		currentLog = append(currentLog, normalErrors...)
 	}
 	if len(panicErrors) != 0 {
-		message := fmt.Sprintf("⚠ W %d plikach wystąpiły nietypowe błędy", len(panicErrors))
+		message := fmt.Sprintf("💀 W %d plikach wystąpiły nietypowe błędy (panic error)", len(panicErrors))
 		log.Println(message)
 		log.Println(panicErrors)
 
