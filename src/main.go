@@ -116,7 +116,9 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 	}
 
 	err = ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
-	log.Print(err)
+	if err != nil {
+		log.Printf("error when operating on corpus file: %s", err)
+	}
 	return err
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type TrimmerDecoder struct {
@@ -61,7 +62,8 @@ func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "PROJECTFILE" {
+			if strings.ToUpper(t.Name.Local) == "PROJECTFILE" {
+				t.Name.Local = "PROJECTFILE"
 				var root *ProjectFile = new(ProjectFile)
 				decoder.Strict = true
 				err := decoder.DecodeElement(&root, &t)
@@ -76,7 +78,8 @@ func NewCorpusFile(inputFile string) (*ProjectFile, *ElementFile, error) {
 					CorpusVersion17To16(root.Element)
 				}
 				return root, nil, nil
-			} else if t.Name.Local == "ELEMENTFILE" {
+			} else if strings.ToUpper(t.Name.Local) == "ELEMENTFILE" {
+				t.Name.Local = "ELEMENTFILE"
 				var root *ElementFile = new(ElementFile)
 				decoder.Strict = true
 				err := decoder.DecodeElement(&root, &t)
@@ -132,19 +135,21 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "PROJECTFILE" {
+			if strings.ToUpper(t.Name.Local) == "PROJECTFILE" {
+				t.Name.Local = "PROJECTFILE"
 				handleOut := handleS3DFile(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {
-						log.Print(err)
+						log.Printf("Error during encode: %s", err)
 						return err
 					}
 				}
-			} else if t.Name.Local == "ELEMENTFILE" {
+			} else if strings.ToUpper(t.Name.Local) == "ELEMENTFILE" {
+				t.Name.Local = "ELEMENTFILE"
 				handleOut := handleE3DFile(decoder, t)
 				if handleOut != nil {
 					if err = encoder.Encode(handleOut); err != nil {
-						log.Print(err)
+						log.Printf("Error during encode: %s", err)
 						return err
 					}
 				}
