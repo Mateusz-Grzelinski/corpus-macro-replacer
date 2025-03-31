@@ -21,7 +21,7 @@ type GenericNode struct {
 
 // E3D file
 type ElementFile struct {
-	// XMLName xml.Name `xml:"ELEMENTFILE"`
+	XMLName xml.Name `xml:"ELEMENTFILE"`
 	GenericNode
 	FILE    xml.Attr  `xml:"FILE,attr"`
 	VER     xml.Attr  `xml:"VER,attr"`
@@ -45,7 +45,7 @@ func (ef *ElementFile) UnmarshalXML(d *xml.Decoder, start xml.StartElement) erro
 
 // S3D file
 type ProjectFile struct {
-	// XMLName xml.Name `xml:"PROJECTFILE"`
+	XMLName xml.Name `xml:"PROJECTFILE"`
 	ElementFile
 }
 
