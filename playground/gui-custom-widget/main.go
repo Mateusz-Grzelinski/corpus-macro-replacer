@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"fyne.io/fyne/v2"
@@ -131,7 +131,7 @@ func main() {
 }
 
 /*
-package main
+package corpus
 
 import (
 	"fyne.io/fyne/v2"

@@ -7,10 +7,10 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 	"syscall"
+
+	"corpus_macro_replacer/corpus"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -32,7 +32,6 @@ const (
 )
 
 var corpusMimeType = []string{"text/plain"}
-var corpustExtensions = []string{".s3d", ".e3d"} // use with strings.Fold
 
 var CorpusTypicallyUsedFolders = []string{
 	`C:\Tri D Corpus\Corpus 4.0\elmsav\`,
@@ -43,11 +42,10 @@ var CorpusTypicallyUsedFolders = []string{
 	`C:\Tri D Corpus\Corpus 6.0\sobasav\`,
 }
 
-var loadedS3DFileForPreview *ProjectFile
-var loadedE3DFileForPreview *ElementFile
+var loadedS3DFileForPreview *corpus.ProjectFile
+var loadedE3DFileForPreview *corpus.ElementFile
 var loadedFileForPreviewError error
 var SelectedPath string
-var MakroCollectionCache MakroCollection = MakroCollection{}
 var corpusPreviewContainer *ElementFileContainer
 var ListOfLoadedFilesContainer *fyne.Container
 var MacrosToChangeEntries []*widget.Entry
@@ -119,8 +117,8 @@ func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	SelectedPath = parsedURL.Host + path
 	stat, err := os.Stat(SelectedPath)
 	if err == nil {
-		if !stat.IsDir() && isCorpusExtension(SelectedPath) {
-			projectFile, elementFile, err := NewCorpusFile(SelectedPath)
+		if !stat.IsDir() && corpus.IsCorpusExtension(SelectedPath) {
+			projectFile, elementFile, err := corpus.NewCorpusFile(SelectedPath)
 			if elementFile != nil {
 				loadedS3DFileForPreview = nil
 				loadedE3DFileForPreview = elementFile
@@ -245,24 +243,6 @@ func getLeftPanel(a fyne.App, myWindow *fyne.Window) *fyne.Container {
 	return CorpusFileTreeContainer
 }
 
-// best effort, returned path might not exist
-func getMacroNameByFileName(makroSearchPath string, path string, cache *MakroCollection) string {
-	if cache != nil {
-		if out := cache.GetMacroNameByFileName(path); out != nil {
-			return *out
-		}
-	}
-	relPath, err := filepath.Rel(makroSearchPath, path)
-	if err != nil {
-		path = relPath
-	}
-	base, found := strings.CutSuffix(path, ".CMK")
-	if found {
-		return filepath.Base(base)
-	}
-	return filepath.Base(path)
-}
-
 func RemoveEntry(slice []*widget.Entry, item *widget.Entry) []*widget.Entry {
 	for i, o := range slice {
 		if o != item {
@@ -323,11 +303,11 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 		newMacroPathEntry.OnChanged = func(path string) {
 			// wasteful but the best error reporting
 			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
-			_, err := NewMakroFromCMKFile(nil, path, &makroRootPath, MakroCollectionCache.GetMakroMappings())
+			_, err := corpus.NewMakroFromCMKFile(nil, path, &makroRootPath, corpus.MakroCollectionCache.GetMakroMappings())
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 				makroErrorLabel.SetText(fmt.Sprintf("ERROR: %s", err))
-				var unkownMakroError *CMKUnknownMakroError
+				var unkownMakroError *corpus.CMKUnknownMakroError
 				var targetErr *fs.PathError
 				if errors.As(err, &targetErr) && targetErr.Op == "open" && errors.Is(targetErr.Err, syscall.ERROR_FILE_NOT_FOUND) {
 					autoFixError.Show()
@@ -342,7 +322,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				} else if errors.As(err, &unkownMakroError) {
 					autoFixError.Show()
 					autoFixError.OnTapped = func() {
-						makroRecoveryDialog := NewDialogMakroRecovery(a, *myWindow, unkownMakroError.name)
+						makroRecoveryDialog := NewDialogMakroRecovery(a, *myWindow, unkownMakroError.Name)
 						makroRecoveryDialog.SetOnClosed(func() {
 							tmpNewMacroPathEntry := newMacroPathEntry // idk if tmp is needed
 							tmpNewMacroPathEntry.OnChanged(path)
@@ -356,7 +336,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				makroErrorLabel.Show()
 			} else {
 				makroSearchPath := a.Preferences().String("makroSearchPath")
-				newMacroNameEntry.SetText(getMacroNameByFileName(makroSearchPath, path, &MakroCollectionCache))
+				newMacroNameEntry.SetText(corpus.GetMacroNameByFileName(makroSearchPath, path, &corpus.MakroCollectionCache))
 				makroErrorLabel.Importance = widget.MediumImportance
 				makroErrorLabel.Hide()
 				refreshCorpusPreviewFunc()
@@ -390,7 +370,7 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 						newMacroPathEntry.SetText(path)
 
 						makroSearchPath := a.Preferences().String("makroSearchPath")
-						newMacroNameEntry.SetText(getMacroNameByFileName(makroSearchPath, path, &MakroCollectionCache))
+						newMacroNameEntry.SetText(corpus.GetMacroNameByFileName(makroSearchPath, path, &corpus.MakroCollectionCache))
 						row.Refresh()
 					}, *myWindow)
 
@@ -440,12 +420,6 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 	return accordion
 }
 
-func isCorpusExtension(path string) bool {
-	// todo use strings.EqualFold()?
-	ext := strings.ToLower(filepath.Ext(path))
-	return slices.Contains(corpustExtensions, ext)
-}
-
 func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel *toolbarLabel) func() {
 	refreshCorpusPreviewFunc = func() {
 		vBox.RemoveAll()
@@ -463,7 +437,7 @@ func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel
 			vBox.Add(l2)
 			vBox.Add(l3)
 		} else {
-			if !isCorpusExtension(SelectedPath) {
+			if !corpus.IsCorpusExtension(SelectedPath) {
 				l := widget.NewLabel("To nie jest plik Corpusa: ")
 				l.Wrapping = fyne.TextWrapWord
 				lErr := widget.NewLabel(SelectedPath)
@@ -484,7 +458,7 @@ func generateRefreshCorpusPreview(a fyne.App, vBox *fyne.Container, toolbarLabel
 			if loadedE3DFileForPreview == nil && loadedS3DFileForPreview == nil {
 				return
 			}
-			var elementFileToDisplay *ElementFile
+			var elementFileToDisplay *corpus.ElementFile
 			if loadedE3DFileForPreview != nil {
 				elementFileToDisplay = loadedE3DFileForPreview
 			}

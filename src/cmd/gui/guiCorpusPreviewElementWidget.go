@@ -1,6 +1,7 @@
 package main
 
 import (
+	"corpus_macro_replacer/corpus"
 	"fmt"
 	"strings"
 
@@ -29,7 +30,7 @@ type ElementContainer struct {
 	nestedContent    *fyne.Container
 }
 
-func NewElement(element *Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) *ElementContainer {
+func NewElement(element *corpus.Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) *ElementContainer {
 	leftPadding := canvas.NewRectangle(nil)                        // Empty rectangle
 	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
 	h := container.NewHBox(leftPadding)
@@ -117,7 +118,7 @@ func (ec *ElementContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(ec.all)
 }
 
-func (ec *ElementContainer) Update(element Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) bool {
+func (ec *ElementContainer) Update(element corpus.Element, nestLevel int, compact bool, hideElementsWithZeroMacros bool) bool {
 	totalMacros := ElementTotalNumOfMacros(&element)
 	if hideElementsWithZeroMacros {
 		if totalMacros == 0 {

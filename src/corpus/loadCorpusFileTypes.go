@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"bytes"
@@ -52,10 +52,11 @@ type ProjectFile struct {
 // single cabinet
 type Element struct {
 	GenericNode
-	EName   xml.Attr `xml:"ENAME,attr"`
-	Daske   Daske    `xml:"DASKE"`
-	ElmList ElmList  `xml:"ELMLIST"`
-	Elinks  Elinks   `xml:"ELINKS"`
+	EName   xml.Attr    `xml:"ENAME,attr"`
+	Daske   Daske       `xml:"DASKE"`
+	Evar    GenericNode `xml:"EVAR"`
+	ElmList ElmList     `xml:"ELMLIST"`
+	Elinks  Elinks      `xml:"ELINKS"`
 }
 
 // list of nested elements
@@ -279,7 +280,7 @@ func NewMM1EmbeddedMakro(m1EmbeddedMakro *M1EmbeddedMakro) (*MM1EmbeddedMakro, e
 
 // extracts name of submacro that is used in Corpus call in [MAKRO] section
 func (em *M1EmbeddedMakro) CalledWith() string {
-	for _, line := range decodeAllCMKLines(em.DAT) {
+	for _, line := range DecodeAllCMKLines(em.DAT) {
 		nameAndValue := strings.SplitN(line, "=", 2)
 		if strings.ToLower(nameAndValue[0]) == "name" {
 			if len(nameAndValue) != 2 {
@@ -532,7 +533,7 @@ func (m *M1) Save(w io.Writer) error {
 		return err
 	}
 	{
-		text := strings.Join(decodeAllCMKLines(m.Varijable.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(m.Varijable.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -541,7 +542,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte("\n\n[JOINT]\n")); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(m.Joint.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(m.Joint.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -550,7 +551,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte("\n\n[FORMULE]\n")); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(m.Formule.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(m.Formule.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -561,7 +562,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(item.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -571,7 +572,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(item.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -581,7 +582,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(item.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -591,7 +592,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(item.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -601,7 +602,7 @@ func (m *M1) Save(w io.Writer) error {
 		if _, err := w.Write([]byte(section)); err != nil {
 			return err
 		}
-		text := strings.Join(decodeAllCMKLines(item.DAT), "\n")
+		text := strings.Join(DecodeAllCMKLines(item.DAT), "\n")
 		if _, err := w.Write([]byte(text)); err != nil {
 			return err
 		}
@@ -625,7 +626,7 @@ func (e *Element) VisitElementsAndSubelements(f func(*Element)) {
 
 // visit self and submakros
 func (m *M1) VisitSubmakros(f func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro)) {
-	f(m, nil, nil) // entrypoiny
+	f(m, nil, nil) // entrypoint
 	m.partialVisitSubmakros(nil, f)
 }
 

@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"bufio"
@@ -14,11 +14,11 @@ import (
 )
 
 type CMKUnknownMakroError struct {
-	name string
+	Name string
 }
 
 func (e *CMKUnknownMakroError) Error() string {
-	return fmt.Sprintf("can not find makro \"%s\"   ", e.name)
+	return fmt.Sprintf("can not find makro \"%s\"   ", e.Name)
 }
 
 const CMKLineSeparator = `,`
@@ -77,7 +77,7 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 	}
 	makroFile, _ = filepath.Abs(makroFile)
 	if makroName == nil {
-		tmp := getMacroNameByFileName(makroFile, makroFile, &MakroCollectionCache) // ugh refering to global var
+		tmp := GetMacroNameByFileName(makroFile, makroFile, &MakroCollectionCache) // ugh refering to global var
 		makroName = &tmp
 	}
 	initialMakro, err := partialNewMakroFromCMKFile(*makroName, makroFile)
@@ -113,10 +113,10 @@ func NewMakroFromCMKFile(makroName *string, makroFile string, makroRootPath *str
 			submacroPathAbs = filepath.Join(*makroRootPath, submacroPathAbs)
 		} else {
 			// best effort search for file in makroRootPath
-			submakroFoundPath, found := findFile(*makroRootPath, *makroToProcessName+".CMK")
+			submakroFoundPath, found := FindFile(*makroRootPath, *makroToProcessName+".CMK")
 			submacroPathAbs = submakroFoundPath
 			if found != nil {
-				return nil, &CMKUnknownMakroError{name: *makroToProcessName}
+				return nil, &CMKUnknownMakroError{Name: *makroToProcessName}
 			} else {
 				log.Printf("Warning: makro \"%s\" was found by searching \"%s\": \"%s\"", *makroToProcessName, *makroRootPath, submakroFoundPath)
 			}
@@ -245,7 +245,7 @@ func decodeCMKLine(line string) string {
 	return lineTrimmed
 }
 
-func decodeAllCMKLines(DAT string) []string {
+func DecodeAllCMKLines(DAT string) []string {
 	lines := []string{}
 	for _, line := range strings.Split(DAT, CMKLineSeparator) {
 		lines = append(lines, decodeCMKLine(line))

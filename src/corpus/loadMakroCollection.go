@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"bufio"
@@ -9,10 +9,31 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"unicode/utf8"
 )
 
+var MakroCollectionCache MakroCollection = MakroCollection{}
+
 type MakroCollection []MakroCollectionItem
+
+// best effort, returned path might not exist
+func GetMacroNameByFileName(makroSearchPath string, path string, cache *MakroCollection) string {
+	if cache != nil {
+		if out := cache.GetMacroNameByFileName(path); out != nil {
+			return *out
+		}
+	}
+	relPath, err := filepath.Rel(makroSearchPath, path)
+	if err != nil {
+		path = relPath
+	}
+	base, found := strings.CutSuffix(path, ".CMK")
+	if found {
+		return filepath.Base(base)
+	}
+	return filepath.Base(path)
+}
 
 func (mc *MakroCollection) GetMacroNameByFileName(path string) *string {
 	// if MakroCollectionCache == nil {

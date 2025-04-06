@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"corpus_macro_replacer/corpus"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -54,17 +55,17 @@ func removeRelativePrefix(path string) string {
 	return path
 }
 
-func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*M1, makroRename map[string]string, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
+func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*corpus.M1, makroRename map[string]string, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("panic occured: ", r)
 			*err = fmt.Sprintf("💀 FATAL: %s: %s", inputFile, r)
 		}
 	}()
-	return ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, makroRename, alwaysConvertLocalToGlobal, verbose, minify)
+	return corpus.ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, makroRename, alwaysConvertLocalToGlobal, verbose, minify)
 }
 
-func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, makroOldNameToNewName map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping MakroMappings) {
+func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, makroOldNameToNewName map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping corpus.MakroMappings) {
 	log.Printf("Generating output to: %s", outputDir)
 	// originalStderr := os.Stderr
 	// // Create a pipe to capture stderr
@@ -77,7 +78,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 	// todo make panic handler to write to stderr
 
 	// var buf bytes.Buffer
-	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, makroRootPath, makroMapping)
+	makrosToReplace, err := corpus.ReadMakrosFromCMK(makroFiles, makroRootPath, makroMapping)
 	currentLog, _ := logData.Get()
 	if err != nil {
 		log.Println(err)
@@ -147,7 +148,7 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 	return func() {
 		foundCorpusFiles := []string{}
 		for _, dirOrFile := range loadedFiles {
-			foundCorpusFiles = append(foundCorpusFiles, FindCorpusFiles(dirOrFile.path)...)
+			foundCorpusFiles = append(foundCorpusFiles, corpus.FindCorpusFiles(dirOrFile.path)...)
 		}
 		outputPath := widget.NewEntry()
 		// outputPath.PlaceHolder = CorpusMacroReplacerDefaultPath
@@ -211,7 +212,7 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 							verbose := a.Preferences().Bool("verbose")
 							minify := a.Preferences().Bool("minify")
 							makroRootPath := a.Preferences().String("makroSearchPath")
-							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, macrosToRename, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, MakroCollectionCache.GetMakroMappings())
+							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, macrosToRename, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, corpus.MakroCollectionCache.GetMakroMappings())
 							logWindow.Refresh()
 						}),
 						widget.NewButtonWithIcon("", theme.MoreVerticalIcon(), func() {

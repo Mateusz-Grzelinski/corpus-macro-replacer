@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"log"
@@ -55,11 +55,11 @@ const (
 )
 
 type Change struct {
-	oldName  *string
-	newName  *string
-	oldValue string
-	newValue string
-	result   UpdateResult
+	OldName  *string
+	NewName  *string
+	OldValue string
+	NewValue string
+	Result   UpdateResult
 }
 
 /*

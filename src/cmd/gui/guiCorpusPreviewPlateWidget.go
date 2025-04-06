@@ -1,6 +1,7 @@
 package main
 
 import (
+	"corpus_macro_replacer/corpus"
 	"fmt"
 	"strconv"
 
@@ -28,7 +29,7 @@ type PlateContainer struct {
 }
 
 // formatka/Daske
-func NewPlate(element *Element, adIndex int, nestLevel int, compact bool) *PlateContainer {
+func NewPlate(element *corpus.Element, adIndex int, nestLevel int, compact bool) *PlateContainer {
 	leftPadding := canvas.NewRectangle(nil)                        // Empty rectangle
 	leftPadding.SetMinSize(fyne.NewSize(float32(20*nestLevel), 0)) // 20 units wide
 	h := container.NewHBox(leftPadding)
@@ -100,7 +101,7 @@ func (pc *PlateContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(pc.all)
 }
 
-func DaskeTotalNumOfMacros(element *Element, adIndex int) int {
+func DaskeTotalNumOfMacros(element *corpus.Element, adIndex int) int {
 	howManyMacros := 0
 	for _, spoj := range element.Elinks.Spoj {
 		_adIndex, _ := strconv.Atoi(spoj.O1.Value)
@@ -112,7 +113,7 @@ func DaskeTotalNumOfMacros(element *Element, adIndex int) int {
 	return howManyMacros
 }
 
-func (pc *PlateContainer) Update(element *Element, adIndex int, compact bool, hideElementsWithZeroMacros bool) bool {
+func (pc *PlateContainer) Update(element *corpus.Element, adIndex int, compact bool, hideElementsWithZeroMacros bool) bool {
 	if hideElementsWithZeroMacros {
 		if DaskeTotalNumOfMacros(element, adIndex) == 0 {
 			pc.Hide()

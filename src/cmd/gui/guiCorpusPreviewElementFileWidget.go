@@ -1,6 +1,8 @@
 package main
 
 import (
+	"corpus_macro_replacer/corpus"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -10,7 +12,7 @@ type ElementFileContainer struct {
 	widget.BaseWidget
 	content *fyne.Container
 	// actual corpus file, maybe not needed?
-	elementFile *ElementFile
+	elementFile *corpus.ElementFile
 	// filters
 	// hideElementsWithZeroMacros bool
 
@@ -29,7 +31,7 @@ type ElementFileContainer struct {
 	elementContainer []*ElementContainer
 }
 
-func NewElementFileContainer(ef *ElementFile, compact bool, hideElementsWithZeroMacros bool) *ElementFileContainer {
+func NewElementFileContainer(ef *corpus.ElementFile, compact bool, hideElementsWithZeroMacros bool) *ElementFileContainer {
 	c := container.NewVBox()
 	efc := &ElementFileContainer{
 		content:          c,
@@ -60,11 +62,11 @@ func (mc *ElementFileContainer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(mc.content)
 }
 
-func ElementTotalNumOfMacros(element *Element) int {
+func ElementTotalNumOfMacros(element *corpus.Element) int {
 	return _elementTotalNumOfMacros(element, 0)
 }
 
-func _elementTotalNumOfMacros(element *Element, accumulate int) int {
+func _elementTotalNumOfMacros(element *corpus.Element, accumulate int) int {
 	numOfMacros := len(element.Elinks.Spoj) + accumulate
 	for _, elem := range element.ElmList.Elm {
 		numOfMacros = _elementTotalNumOfMacros(&elem, numOfMacros)
@@ -72,7 +74,7 @@ func _elementTotalNumOfMacros(element *Element, accumulate int) int {
 	return numOfMacros
 }
 
-func (efc *ElementFileContainer) Update(elementFile *ElementFile, compact bool, hideElementsWithZeroMacros bool) {
+func (efc *ElementFileContainer) Update(elementFile *corpus.ElementFile, compact bool, hideElementsWithZeroMacros bool) {
 	efc.elementFile = elementFile
 	for elementIndex, elementCon := range efc.elementContainer {
 		element := elementFile.Element[elementIndex]

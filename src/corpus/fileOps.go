@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func findFile(directory, filename string) (string, error) {
+func FindFile(directory, filename string) (string, error) {
 	var foundPath string
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -31,8 +31,8 @@ func findFile(directory, filename string) (string, error) {
 	return foundPath, nil
 }
 
-// copyFile copies a file from src to dst.
-func copyFile(src, dst string) error {
+// CopyFile copies a file from src to dst.
+func CopyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err

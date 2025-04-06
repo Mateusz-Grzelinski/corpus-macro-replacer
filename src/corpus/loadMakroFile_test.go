@@ -1,4 +1,4 @@
-package main
+package corpus
 
 import (
 	"path/filepath"
@@ -117,7 +117,7 @@ func TestNewMakroFromCMKFileLoadMakroByNameBasicNameMappingFails(t *testing.T) {
 		t.Log(makro)
 	}
 	targetErr, ok := err.(*CMKUnknownMakroError)
-	if !ok || targetErr.name != "creative_user_wants_to_load_simple" {
+	if !ok || targetErr.Name != "creative_user_wants_to_load_simple" {
 		t.Error("error should be type UnknownMakroError")
 		t.Log(err)
 	}
@@ -135,7 +135,7 @@ func TestNewMakroFromCMKFileLoadMakroByNameFindInFilesFails(t *testing.T) {
 		t.Log(makro)
 	}
 	targetErr, ok := err.(*CMKUnknownMakroError)
-	if !ok || targetErr.name != "simple" {
+	if !ok || targetErr.Name != "simple" {
 		t.Error("error should be type UnknownMakroError")
 		t.Log(err)
 	}

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	"corpus_macro_replacer/corpus"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -63,8 +65,8 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 	makroCollectionEntry := widget.NewEntry()
 	makroCollectionEntry.SetText(makroCollectionPath)
 	makroCollectionEntry.OnChanged = func(inputPath string) {
-		collection, err := NewMakroCollection(inputPath)
-		MakroCollectionCache = collection
+		collection, err := corpus.NewMakroCollection(inputPath)
+		corpus.MakroCollectionCache = collection
 		errLabel.Show()
 		if err != nil {
 			errLabel.SetText(fmt.Sprintf("error: %s", err))
@@ -81,5 +83,4 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 	}
 	makroCollectionEntry.OnChanged(makroCollectionPath) // run to report any errors
 	return widget.NewCard("Ustawienia makr", "", container.NewVBox(labelSearch, makroSearchEntry, label, makroCollectionEntry, errLabel))
-
 }

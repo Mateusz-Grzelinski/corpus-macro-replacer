@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"corpus_macro_replacer/corpus"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,9 +42,9 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 	filterDialog := dialog.NewCustom("Szukam brakującego makra", "Zamknij", container.NewVBox(card1, card2, cardFail, cardOk), w)
 	continueRecovery := true
 	if continueRecovery {
-		foundFile, _ := findFile(makroSearchPath, failedMakroName+".CMK")
+		foundFile, _ := corpus.FindFile(makroSearchPath, failedMakroName+".CMK")
 		if foundFile != "" {
-			err := copyFile(foundFile, missingMakroPath)
+			err := corpus.CopyFile(foundFile, missingMakroPath)
 			if err != nil {
 				card1Result.SetText(fmt.Sprintf("Znaleziono: \"%s\" i ale nie udało się skopiować do \"%s\": %s", foundFile, missingMakroPath, err))
 			} else {
@@ -57,7 +58,7 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 	}
 
 	if continueRecovery {
-		var elementFile *ElementFile
+		var elementFile *corpus.ElementFile
 		if loadedE3DFileForPreview != nil {
 			elementFile = loadedE3DFileForPreview
 		} else if loadedS3DFileForPreview != nil {
@@ -65,9 +66,9 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 		}
 		if elementFile != nil {
 			// todo there is no way to break early the visit walk
-			elementFile.VisitElementsAndSubelements(func(e *Element) {
+			elementFile.VisitElementsAndSubelements(func(e *corpus.Element) {
 				for _, s := range e.Elinks.Spoj {
-					s.Makro1.VisitSubmakros(func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro) {
+					s.Makro1.VisitSubmakros(func(parent *corpus.M1, embededParent *corpus.M1EmbeddedMakro, child *corpus.M1EmbeddedMakro) {
 						if !continueRecovery {
 							return // lame version of break early
 						}

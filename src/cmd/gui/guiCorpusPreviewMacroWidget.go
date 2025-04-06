@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"corpus_macro_replacer/corpus"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -22,8 +23,8 @@ type MacroContainer struct {
 	contentDiff   *fyne.Container
 	isOpen        bool
 	parentPlate   *PlateContainer
-	oldMakro      *M1
-	newMakro      *M1
+	oldMakro      *corpus.M1
+	newMakro      *corpus.M1
 
 	// for reference when updating
 	openButton          *widget.Button
@@ -92,7 +93,7 @@ func NewMacroContainer(nestLevel int, parentPlate *PlateContainer) *MacroContain
 		}
 		MacrosDefaultPathNormal := fyne.CurrentApp().Preferences().String("makroSearchPath")
 		oldMakroNameWithExtension := mc.oldMakro.MakroName + ".CMK"
-		macroFileName := cmp.Or(MakroCollectionCache.GetMacroFileNameByName(mc.oldMakro.MakroName), &oldMakroNameWithExtension)
+		macroFileName := cmp.Or(corpus.MakroCollectionCache.GetMacroFileNameByName(mc.oldMakro.MakroName), &oldMakroNameWithExtension)
 		macroGuessedPath := filepath.Join(MacrosDefaultPathNormal, *macroFileName)
 		addToLoadedFilesAndRefresh(SelectedPath)
 		for _, makroTochangeName := range MacrosToChangeNamesEntries {
@@ -137,15 +138,15 @@ func NewMacroContainer(nestLevel int, parentPlate *PlateContainer) *MacroContain
 	return mc
 }
 
-func smartTextComparison(changes []Change) (string, string) {
+func smartTextComparison(changes []corpus.Change) (string, string) {
 	var oldReformatted strings.Builder
 	var newReformatted strings.Builder
 
 	// first some stats
 	hasSameValues := 0
 	for _, change := range changes {
-		switch change.result {
-		case ValueSame:
+		switch change.Result {
+		case corpus.ValueSame:
 			hasSameValues++
 		}
 	}
@@ -156,27 +157,27 @@ func smartTextComparison(changes []Change) (string, string) {
 
 	// actual diff
 	for _, change := range changes {
-		switch change.result {
-		case ValueAdded:
+		switch change.Result {
+		case corpus.ValueAdded:
 			// oldReformatted.WriteString("\n")
-			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// nowa zmienna dodana\n", *change.newName, change.newValue))
-		case ValueSame:
-			oldReformatted.WriteString(fmt.Sprintf("%s=%s\n", *change.oldName, change.oldValue))
+			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// nowa zmienna dodana\n", *change.NewName, change.NewValue))
+		case corpus.ValueSame:
+			oldReformatted.WriteString(fmt.Sprintf("%s=%s\n", *change.OldName, change.OldValue))
 			newReformatted.WriteString("\n")
 		default:
-			oldReformatted.WriteString(fmt.Sprintf("%s=%s\n", *change.oldName, change.oldValue))
-			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// zachowano starą wartość (wartość obecna:%s)\n", *change.newName, *&change.oldValue, change.newValue))
+			oldReformatted.WriteString(fmt.Sprintf("%s=%s\n", *change.OldName, change.OldValue))
+			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// zachowano starą wartość (wartość obecna:%s)\n", *change.NewName, *&change.OldValue, change.NewValue))
 		}
 	}
 
 	return oldReformatted.String(), newReformatted.String()
 }
 
-func NewRichTextFromCMK(prefix string, a *GenericNodeWithDat) *widget.RichText {
+func NewRichTextFromCMK(prefix string, a *corpus.GenericNodeWithDat) *widget.RichText {
 	if a == nil {
 		return NewRichTextFromCode(prefix, "\n")
 	}
-	return NewRichTextFromCode(prefix, strings.Join(decodeAllCMKLines(a.DAT), "\n")+"\n")
+	return NewRichTextFromCode(prefix, strings.Join(corpus.DecodeAllCMKLines(a.DAT), "\n")+"\n")
 }
 
 func NewRichTextFromCode(prefix string, code string) *widget.RichText {
@@ -192,7 +193,7 @@ func NewHSplitFromCMK(leading fyne.CanvasObject, trailing fyne.CanvasObject) *co
 	return split
 }
 
-func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
+func (mc *MacroContainer) UpdateMacroForDiff(newMakro *corpus.M1, compact bool) {
 	mc.newMakro = newMakro
 	oldMakro := mc.oldMakro
 	if newMakro == nil {
@@ -233,7 +234,7 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 		// todo only varijable changes are returned
 
 		newMakroCopyUntilIFixTheUpdateMakro := *newMakro
-		varijableChanges := UpdateMakro(mc.oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, nil, false)
+		varijableChanges := corpus.UpdateMakro(mc.oldMakro, &newMakroCopyUntilIFixTheUpdateMakro, nil, false)
 		old, new := smartTextComparison(varijableChanges)
 		newRichText := NewRichTextFromCode("[VARIJABLE]\n// po zaktualizowaniu z pliku .CMK, ", new)
 		oldRichText := NewRichTextFromCode("[VARIJABLE]\n// wczytane z Corpusa\n", old)
@@ -290,14 +291,14 @@ func (mc *MacroContainer) UpdateMacroForDiff(newMakro *M1, compact bool) {
 	mc.contentDiff.Objects[9] = showAllMakro
 }
 
-func (mc *MacroContainer) Update(oldMakro *M1, compact bool) {
+func (mc *MacroContainer) Update(oldMakro *corpus.M1, compact bool) {
 	mc.oldMakro = oldMakro
 	mc.newMakro = nil
-	var newMakro *M1
+	var newMakro *corpus.M1
 	for i, makroToChangeName := range MacrosToChangeNamesEntries {
 		if oldMakro.MakroName == makroToChangeName.Text {
 			makroRootPath := fyne.CurrentApp().Preferences().String("makroSearchPath")
-			makro, err := NewMakroFromCMKFile(nil, MacrosToChangeEntries[i].Text, &makroRootPath, MakroCollectionCache.GetMakroMappings())
+			makro, err := corpus.NewMakroFromCMKFile(nil, MacrosToChangeEntries[i].Text, &makroRootPath, corpus.MakroCollectionCache.GetMakroMappings())
 			if err != nil {
 				log.Printf("ERROR: reading makro failed: %s\n", err)
 			}
