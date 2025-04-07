@@ -612,15 +612,15 @@ func (m *M1) Save(w io.Writer) error {
 }
 
 func (ef *ElementFile) VisitElementsAndSubelements(f func(*Element)) {
-	for _, e := range ef.Element {
-		e.VisitElementsAndSubelements(f)
+	for i := range ef.Element {
+		ef.Element[i].VisitElementsAndSubelements(f)
 	}
 }
 
 func (e *Element) VisitElementsAndSubelements(f func(*Element)) {
 	f(e)
-	for _, sube := range e.ElmList.Elm {
-		sube.VisitElementsAndSubelements(f)
+	for i := range e.ElmList.Elm {
+		e.ElmList.Elm[i].VisitElementsAndSubelements(f)
 	}
 }
 
@@ -631,7 +631,8 @@ func (m *M1) VisitSubmakros(f func(parent *M1, embededParent *M1EmbeddedMakro, c
 }
 
 func (m *M1) partialVisitSubmakros(embededParent *M1EmbeddedMakro, f func(parent *M1, embededParent *M1EmbeddedMakro, child *M1EmbeddedMakro)) {
-	for _, submacro := range m.Makro {
+	for i := range m.Makro {
+		submacro := m.Makro[i]
 		f(m, embededParent, &submacro)
 		submacro.MAK.partialVisitSubmakros(&submacro, f)
 	}

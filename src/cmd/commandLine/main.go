@@ -11,8 +11,6 @@ import (
 	"corpus_macro_replacer/corpus"
 )
 
-//go:generate fyne bundle -o src/bundled.go assets/
-
 const Version = "0.7"
 
 type arrayFlags []string
