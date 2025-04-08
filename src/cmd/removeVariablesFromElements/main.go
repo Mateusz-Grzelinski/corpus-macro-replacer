@@ -14,8 +14,18 @@ import (
 const Version = "0.1"
 
 var variablesToRemove []string = []string{
-	"(?i)_*most_outer_global_var.*=.*",
-	"(?i)unused_parent_variable",
+	"ilosc_zawiasow=.*",
+	"producent_zawiasu=.*",
+	"typ_prowadnika_rodzaj=.*",
+	"typ_zawiasu_s=.*",
+	"zmiana_pozycji_dolnego=.*",
+	"zmiana_pozycji_gornego=.*",
+	"zmiana_pozycji_3=.*",
+	"zmiana_pozycji_4=.*",
+	"zmiana_pozycji_5=.*",
+	"zmiana_pozycji_6=.*",
+	"przesuniecie_prowadnik=.*",
+	"przesuniecie_zawias=.*",
 }
 
 func main() {
@@ -42,9 +52,9 @@ func main() {
 	}
 
 	regexes := make([]*regexp.Regexp, len(variablesToRemove))
-	for _, pattern := range variablesToRemove {
+	for i, pattern := range variablesToRemove {
 		r := regexp.MustCompile(pattern)
-		regexes = append(regexes, r)
+		regexes[i] = r
 	}
 	projectFile, elementFile, err := corpus.NewCorpusFile(*input)
 	if err != nil {
@@ -67,18 +77,23 @@ func RemoveVariablesFromFile[T CanWalkElements](projectFile T, removePatterns []
 	RemoveVariablesCallback := func(e *corpus.Element) {
 		log.Printf("Element: %s", e.EName.Value)
 		newAttributes := []xml.Attr{}
+	to_next_attribute:
 		for _, attr := range e.Evar.Attr {
-			for _, pattern := range removePatterns {
-				if !strings.HasPrefix(attr.Name.Local, "VAR") {
-					newAttributes = append(newAttributes, attr)
-					continue
-				}
-				if pattern.MatchString(attr.Value) {
-					continue
-				}
-				newName := fmt.Sprintf("VAR%d", len(newAttributes))
-				newAttributes = append(newAttributes, xml.Attr{Name: xml.Name{Local: newName}, Value: attr.Value})
+			if !strings.HasPrefix(attr.Name.Local, "VAR") {
+				// some unknown attribute, leave it alone
+				newAttributes = append(newAttributes, attr)
+				continue
 			}
+			for _, pattern := range removePatterns {
+				// all attributes here are VAR0, VAR1, ...
+				if pattern.MatchString(attr.Value) {
+					// matches the pattern, remove it
+					continue to_next_attribute
+				}
+			}
+			// does not match pattern, leave it alone
+			newName := fmt.Sprintf("VAR%d", len(newAttributes))
+			newAttributes = append(newAttributes, xml.Attr{Name: xml.Name{Local: newName}, Value: attr.Value})
 		}
 		log.Printf("Removed %d/%d variables", len(e.Evar.Attr)-len(newAttributes), len(e.Evar.Attr))
 		e.Evar.Attr = newAttributes

@@ -12,7 +12,7 @@ var pathToE3DTestData = filepath.Join("..", "..", "..", "tests", "testData", "E3
 func TestRemoveVariable(t *testing.T) {
 	projectFile, elementFile, err := corpus.NewCorpusFile(filepath.Join(pathToE3DTestData, "nested_variables.E3D"))
 	if err != nil {
-		t.Logf("missing test datas? %s", err)
+		t.Logf("missing test data? %s", err)
 		t.FailNow()
 	}
 	if projectFile != nil {
