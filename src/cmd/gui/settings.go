@@ -51,7 +51,7 @@ const (
 
 func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 	labelSearch := widget.NewLabel("Domyślna ścieżka szukania Makr")
-	makroSearchPath := a.Preferences().StringWithFallback("makroSearchPath", `C:\Tri D Corpus\Corpus 5.0\Makro\`)
+	makroSearchPath := a.Preferences().StringWithFallback("makroSearchPath", `C:\Tri D Corpus\Corpus 6.0\Makro\`)
 	makroSearchEntry := widget.NewEntry()
 	makroSearchEntry.SetText(makroSearchPath)
 	makroSearchEntry.OnChanged = func(inputPath string) {
@@ -61,7 +61,7 @@ func NewCorpusMakroReplacerSettings(a fyne.App) *widget.Card {
 	label.Wrapping = fyne.TextWrapBreak
 	errLabel := widget.NewLabel("")
 	errLabel.Wrapping = fyne.TextWrapBreak
-	makroCollectionPath := a.Preferences().StringWithFallback("makroCollectionPath", `C:\Tri D Corpus\Corpus 5.0\Makro\MakroCollection.dat`)
+	makroCollectionPath := a.Preferences().StringWithFallback("makroCollectionPath", `C:\Tri D Corpus\Corpus 6.0\Makro\MakroCollection.dat`)
 	makroCollectionEntry := widget.NewEntry()
 	makroCollectionEntry.SetText(makroCollectionPath)
 	makroCollectionEntry.OnChanged = func(inputPath string) {
