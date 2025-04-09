@@ -10,7 +10,8 @@ import (
 )
 
 const pathToOriginal = "integrationTest/Kontenerek 9 w 1-original.E3D"
-const pathToDesired = "integrationTest/Kontenerek 9 w 1-desired-blum_standard.E3D"
+
+// const pathToDesired = "integrationTest/Kontenerek 9 w 1-desired-blum_standard.E3D"
 
 var variablesToRemoveTest []string = []string{
 	"ilosc_zawiasow",
@@ -27,31 +28,31 @@ var variablesToRemoveTest []string = []string{
 	"przesuniecie_zawias",
 }
 
-var variablesToPreserveTest []string = []string{
-	"ilosc_zawiasow_1",
-	"typ_zawiasu_1",
-	"rodzaj_zawiasu_1",
-	"Przeliczenie_Blum",
-	"mocowanie_puszki_1",
-	"zawias_1",
-	"typ_prowadnika_1",
-	"mocowanie_prowadnika_1",
-	"blumotion_1",
-	"zmiana_pozycji_dolnego",
-	"zmiana_pozycji_gornego",
-	"zmiana_pozycji_3",
-	"zmiana_pozycji_4",
-	"zmiana_pozycji_5",
-	"zmiana_pozycji_6",
-	"przesuniecie_prowadnik",
-	"przesuniecie_zawias",
-	"pierwszy_zawiasBlum",
-	"drugi_zawiasBlum",
-	"trzeci_zawiasBlum",
-	"czwarty_zawiasBlum",
-	"piaty_zawiasBlum",
-	"szosty_zawiasBlum",
-}
+// var variablesToPreserveTest []string = []string{
+// 	"ilosc_zawiasow_1",
+// 	"typ_zawiasu_1",
+// 	"rodzaj_zawiasu_1",
+// 	"Przeliczenie_Blum",
+// 	"mocowanie_puszki_1",
+// 	"zawias_1",
+// 	"typ_prowadnika_1",
+// 	"mocowanie_prowadnika_1",
+// 	"blumotion_1",
+// 	"zmiana_pozycji_dolnego",
+// 	"zmiana_pozycji_gornego",
+// 	"zmiana_pozycji_3",
+// 	"zmiana_pozycji_4",
+// 	"zmiana_pozycji_5",
+// 	"zmiana_pozycji_6",
+// 	"przesuniecie_prowadnik",
+// 	"przesuniecie_zawias",
+// 	"pierwszy_zawiasBlum",
+// 	"drugi_zawiasBlum",
+// 	"trzeci_zawiasBlum",
+// 	"czwarty_zawiasBlum",
+// 	"piaty_zawiasBlum",
+// 	"szosty_zawiasBlum",
+// }
 
 // func checkForWantedVars(t *testing.T, attrs []xml.Attr) {
 // patterns_loop:

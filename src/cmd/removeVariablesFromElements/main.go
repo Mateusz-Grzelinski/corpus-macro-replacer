@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"corpus_macro_replacer/corpus"
 	"encoding/xml"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -37,7 +39,7 @@ func main() {
 	}
 	var version *bool = flag.Bool("v", false, "print version and exit")
 	var input *string = flag.String("input", "", "required. File or dir, must exist. If dir then changes macro recursively for all .E3D files.")
-	var output *string = flag.String("output", "", `required. File or dir, does not need to exist.`)
+	var output *string = flag.String("output", "", `required. output directory, does not need to exist.`)
 	flag.Parse()
 
 	if *version {
@@ -50,23 +52,81 @@ func main() {
 	if *output == "" {
 		log.Fatalln("-output can not be empty")
 	}
+	err := parseAllfiles(*output, *input, variablesToRemove)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseAllfiles(output string, input string, variablesToRemove []string) error {
+	foundCorpusFiles := []string{}
+	foundCorpusFiles = append(foundCorpusFiles, corpus.FindCorpusFiles(input)...)
 
 	regexes := make([]*regexp.Regexp, len(variablesToRemove))
 	for i, pattern := range variablesToRemove {
 		r := regexp.MustCompile(pattern)
 		regexes[i] = r
 	}
-	projectFile, elementFile, err := corpus.NewCorpusFile(*input)
+
+	errors_occured := []string{}
+	for _, inputFile := range foundCorpusFiles {
+		result, err := parseSingleFile(inputFile, regexes)
+		if err != nil {
+			errors_occured = append(errors_occured, inputFile)
+			log.Printf("error processing file %s: %s", inputFile, err)
+			continue
+		}
+		outputFile := corpus.GetCleanOutputpath(output, inputFile)
+		log.Printf("parsing: %s", outputFile)
+
+		err = os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
+		}
+
+		output, err := os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("error creating output file: %w", err)
+		}
+		defer output.Close()
+
+		var encodedData bytes.Buffer
+		encoder := xml.NewEncoder(&encodedData)
+		encoder.Indent("", "  ")
+		if err = encoder.Encode(result); err != nil {
+			log.Printf("Error during encode: %s", err)
+			return err
+		}
+		_, err = output.Write(encodedData.Bytes())
+		if err != nil {
+			return err
+		}
+		log.Printf("Done writing file: '%s'", outputFile)
+	}
+	if len(errors_occured) > 0 {
+		log.Printf("%d errors occured in files (see log above)", len(errors_occured))
+		for i := range errors_occured {
+			log.Printf("  %s", errors_occured[i])
+		}
+		return fmt.Errorf("some errors occured, see above")
+	}
+	return nil
+}
+
+func parseSingleFile(input string, regexes []*regexp.Regexp) (any, error) {
+	projectFile, elementFile, err := corpus.NewCorpusFile(input)
 	if err != nil {
-		return // fmt.Errorf("")
+		return nil, err
 	}
 	if projectFile != nil {
-		RemoveVariablesFromFile(projectFile, regexes)
+		projectFile, err := RemoveVariablesFromFile(projectFile, regexes)
+		return projectFile, err
 	} else if elementFile != nil {
-		RemoveVariablesFromFile(elementFile, regexes)
+		return RemoveVariablesFromFile(elementFile, regexes)
 	} else {
 		log.Fatal("should not happen")
 	}
+	return nil, fmt.Errorf("Unknown error occured (should not happen)")
 }
 
 type CanWalkElements interface {
@@ -95,7 +155,9 @@ func RemoveVariablesFromFile[T CanWalkElements](projectFile T, removePatterns []
 			newName := fmt.Sprintf("VAR%d", len(newAttributes))
 			newAttributes = append(newAttributes, xml.Attr{Name: xml.Name{Local: newName}, Value: attr.Value})
 		}
-		log.Printf("Removed %d/%d variables", len(e.Evar.Attr)-len(newAttributes), len(e.Evar.Attr))
+		if len(newAttributes) != len(e.Evar.Attr) {
+			log.Printf("Removed %d/%d variables", len(e.Evar.Attr)-len(newAttributes), len(e.Evar.Attr))
+		}
 		e.Evar.Attr = newAttributes
 	}
 	projectFile.VisitElementsAndSubelements(RemoveVariablesCallback)

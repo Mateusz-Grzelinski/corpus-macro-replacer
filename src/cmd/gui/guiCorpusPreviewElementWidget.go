@@ -87,7 +87,7 @@ func NewElement(element *corpus.Element, nestLevel int, compact bool, hideElemen
 	h.Add(stats)
 
 	// c.Add(widget.NewLabel("Todo"))
-	for adIndex, _ := range element.Daske.AD {
+	for adIndex := range element.Daske.AD {
 		_c := NewPlate(element, adIndex, nestLevel+1, compact)
 		content.Add(_c)
 		p.Add(_c)
@@ -138,7 +138,7 @@ func (ec *ElementContainer) Update(element corpus.Element, nestLevel int, compac
 	ec.openButton.SetText(fmt.Sprintf("%s: %s", title, element.EName.Value))
 
 	hiddenPlates := 0
-	for adIndex, _ := range element.Daske.AD {
+	for adIndex := range element.Daske.AD {
 		plateCon := ec.platesContainers.Objects[adIndex].(*PlateContainer)
 		if plateCon.Update(&element, adIndex, compact, hideElementsWithZeroMacros) {
 			hiddenPlates++

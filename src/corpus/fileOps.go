@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func FindFile(directory, filename string) (string, error) {
@@ -51,4 +52,18 @@ func CopyFile(src, dst string) error {
 	}
 
 	return out.Close()
+}
+
+func GetCleanOutputpath(outputDir string, inputFile string) string {
+	relInputFile, _ := filepath.Rel(outputDir, inputFile)
+	cleanedRelInputFile := removeRelativePrefix(relInputFile)
+	outputFile := filepath.Join(outputDir, cleanedRelInputFile)
+	return outputFile
+}
+
+func removeRelativePrefix(path string) string {
+	for strings.HasPrefix(path, "..\\") {
+		path = strings.TrimPrefix(path, "..\\")
+	}
+	return path
 }

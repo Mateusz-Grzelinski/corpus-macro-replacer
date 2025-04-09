@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -106,6 +107,11 @@ func ReadWriteCorpusFile(inputFile string, outputFile string, minify bool,
 	handleE3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
 	handleS3DFile func(decoder *xml.Decoder, start xml.StartElement) xml.Token,
 ) error {
+	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
+	}
+
 	log.Printf("Reading Corpus file: '%s'", inputFile)
 	input, err := os.Open(inputFile)
 	if err != nil {

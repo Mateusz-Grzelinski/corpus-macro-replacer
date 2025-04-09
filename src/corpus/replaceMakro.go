@@ -10,11 +10,6 @@ import (
 )
 
 func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToReplace map[string]*M1, makroRename map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
-	err := os.MkdirAll(filepath.Dir(outputFile), os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("can not create path: '%s': %w", outputFile, err)
-	}
-
 	macrosUpdated := 0
 	macrosSkipped := 0
 
@@ -90,7 +85,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 		return rootCorpusFile
 	}
 
-	err = ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
+	err := ReadWriteCorpusFile(inputFile, outputFile, minify, visitCorpusE3DFile, visitCorpusS3DFile)
 	if err != nil {
 		log.Printf("error when operating on corpus file: %s", err)
 	}

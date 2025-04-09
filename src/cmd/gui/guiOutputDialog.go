@@ -48,13 +48,6 @@ func NewPopupListOfFiles(w fyne.Window, files []string) *widget.List {
 		})
 }
 
-func removeRelativePrefix(path string) string {
-	for strings.HasPrefix(path, "..\\") {
-		path = strings.TrimPrefix(path, "..\\")
-	}
-	return path
-}
-
 func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[string]*corpus.M1, makroRename map[string]string, err *string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -96,9 +89,7 @@ func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDi
 	normalErrors := []string{}
 	for i, inputFile := range foundCorpusFiles {
 		currentLog = append(currentLog, fmt.Sprintf("%d/%d: %s", i+1, len(foundCorpusFiles), inputFile))
-		relInputFile, _ := filepath.Rel(outputDir, inputFile)
-		cleanedRelInputFile := removeRelativePrefix(relInputFile)
-		outputFile := filepath.Join(outputDir, cleanedRelInputFile)
+		outputFile := corpus.GetCleanOutputpath(outputDir, inputFile)
 		var panicErrorToReport *string = new(string)
 		err := WriteOutputTask(inputFile, outputFile, makrosToReplace, makroOldNameToNewName, panicErrorToReport, alwaysConvertLocalToGlobal, verbose, minify)
 		if *panicErrorToReport != "" {

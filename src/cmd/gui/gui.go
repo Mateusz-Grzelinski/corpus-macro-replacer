@@ -110,6 +110,9 @@ func refreshListOfLoadedFiles() {
 
 func CorpusFileTreeOnSelected(uid widget.TreeNodeID) {
 	parsedURL, err := url.Parse(string(uid))
+	if err != nil {
+		log.Printf("error parsing uid: %s", err)
+	}
 	if parsedURL.Scheme != "file" {
 		log.Println("URL scheme must be 'file'", uid)
 	}

@@ -166,7 +166,7 @@ func smartTextComparison(changes []corpus.Change) (string, string) {
 			newReformatted.WriteString("\n")
 		default:
 			oldReformatted.WriteString(fmt.Sprintf("%s=%s\n", *change.OldName, change.OldValue))
-			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// zachowano starą wartość (wartość obecna:%s)\n", *change.NewName, *&change.OldValue, change.NewValue))
+			newReformatted.WriteString(fmt.Sprintf("%s=%s \t// zachowano starą wartość (wartość obecna:%s)\n", *change.NewName, change.OldValue, change.NewValue))
 		}
 	}
 
