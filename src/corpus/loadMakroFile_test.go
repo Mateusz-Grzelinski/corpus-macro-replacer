@@ -5,12 +5,14 @@ import (
 	"testing"
 )
 
-var pathToCMKTestData = filepath.Join("..", "tests", "testData", "CMK")
-var testFilesCMK = []string{
-	"simple.CMK",
-	"loadMakroByFilename.CMK",
-	"loadMakroByNamedMakro.CMK",
-}
+// "c:\\Users\\grzel\\go-projects\\demo\\src\\tests\\testData\\CMK\\simple.CMK"
+var pathToCMKTestData = filepath.Join("..", "..", "tests", "testData", "CMK")
+
+// var testFilesCMK = []string{
+// 	"simple.CMK",
+// 	"loadMakroByFilename.CMK",
+// 	"loadMakroByNamedMakro.CMK",
+// }
 
 func TestNewMakroFromCMKFileSimple(t *testing.T) {
 	makro, err := NewMakroFromCMKFile(nil,
@@ -19,6 +21,7 @@ func TestNewMakroFromCMKFileSimple(t *testing.T) {
 	)
 	if err != nil {
 		t.Error(err)
+		t.FailNow()
 	}
 	if makro.MakroName != "simple" {
 		t.Errorf("makro name is bad: %s", makro.MakroName)
@@ -165,6 +168,34 @@ func TestNewMakroFromCMKFileLoadMakroByNameFindInFilesOk(t *testing.T) {
 		checkMakroSimple(submakro.MAK, t)
 	}
 	if submakro.DAT != "J=0,RT=0,NAME=simple,MB=1,MA=1,INDEX=1,LACZ_BLENDA=,przesuniecie_lewej=,przesuniecie_prawej=,PODAJ_GRUBOSC_PLYTY=,STRONA_NAWIERTU_PUSZKA=,ilosc_nawiertow_srodkowych=" {
+		t.Errorf("submakro DAT is bad: %s", submakro.DAT)
+	}
+}
+
+func TestNewMakroFromCMKFileLoadMakroByNameFindInSubdirOk(t *testing.T) {
+	makro, err := NewMakroFromCMKFile(nil,
+		filepath.Join(pathToCMKTestData, "loadMakroBySubdirFilename.CMK"),
+		nil, nil,
+	)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	if makro.MakroName != "loadMakroBySubdirFilename" {
+		t.Errorf("makro name is bad: %s", makro.MakroName)
+		t.Log(makro.MakroName)
+	}
+	if len(makro.Makro) != 1 {
+		t.Errorf("submakro is bad")
+		t.Log(makro.Makro)
+		t.FailNow()
+	}
+	submakro := makro.Makro[0]
+	if submakro.EmbeddedMakroName != "folder with space/simple" {
+		t.Errorf("submakro name is bad: %s", submakro.EmbeddedMakroName)
+		checkMakroSimple(submakro.MAK, t)
+	}
+	if submakro.DAT != "J=0,RT=0,\"NAME=folder with space/simple\",MB=1,MA=1,INDEX=1,LACZ_BLENDA=,przesuniecie_lewej=,przesuniecie_prawej=,PODAJ_GRUBOSC_PLYTY=,STRONA_NAWIERTU_PUSZKA=,ilosc_nawiertow_srodkowych=" {
 		t.Errorf("submakro DAT is bad: %s", submakro.DAT)
 	}
 }

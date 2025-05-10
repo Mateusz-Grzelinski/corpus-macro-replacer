@@ -29,9 +29,9 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 		widget.NewRichTextFromMarkdown(`
 - zaznacz inny plik Corpusa uruchom AutoFix jeszcze raz
 - autor mógł zmienić nazwę pliku CMK (duże i małe litery mają znaczenie)
-- autor mógł zmienić nazwę makra w pliku MakroCollection.dat (do edycji z poziomy corpusa)
+- autor mógł zmienić nazwę makra w pliku MakroCollection.dat (do edycji z poziomu corpusa: )
 - plik może już nie istnieć
-- edycja nazwy makra nie jest jeszcze wspierana`),
+- edycja nazwy makra nie jest wspierana`),
 	))
 	cardFail.Hide()
 	cardOk := widget.NewCard("Udało się naprawić", "", container.NewVBox(
@@ -42,7 +42,8 @@ func NewDialogMakroRecovery(a fyne.App, w fyne.Window, failedMakroName string) *
 	filterDialog := dialog.NewCustom("Szukam brakującego makra", "Zamknij", container.NewVBox(card1, card2, cardFail, cardOk), w)
 	continueRecovery := true
 	if continueRecovery {
-		foundFile, _ := corpus.FindFile(makroSearchPath, failedMakroName+".CMK")
+		failedFilename := filepath.Base(failedMakroName)
+		foundFile, _ := corpus.FindFile(makroSearchPath, failedFilename+".CMK")
 		if foundFile != "" {
 			err := corpus.CopyFile(foundFile, missingMakroPath)
 			if err != nil {

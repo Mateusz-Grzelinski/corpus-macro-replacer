@@ -8,13 +8,16 @@ import (
 	"strings"
 )
 
-func FindFile(directory, filename string) (string, error) {
+func FindFile(directory, filenameWithSeparators string) (string, error) {
+	dir := filepath.Dir(filenameWithSeparators)
+	basename := filepath.Base(filenameWithSeparators)
+	searchDir := filepath.Join(directory, dir)
 	var foundPath string
-	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && info.Name() == filename {
+		if !info.IsDir() && info.Name() == basename {
 			foundPath = path
 			return filepath.SkipDir // Stop searching once found
 		}
@@ -26,7 +29,7 @@ func FindFile(directory, filename string) (string, error) {
 	}
 
 	if foundPath == "" {
-		return "", fmt.Errorf("file '%s' not found in directory '%s'", filename, directory)
+		return "", fmt.Errorf("file '%s' not found in directory '%s'", filenameWithSeparators, directory)
 	}
 
 	return foundPath, nil
