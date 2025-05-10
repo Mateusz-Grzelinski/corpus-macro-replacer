@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"corpus_macro_replacer/corpus"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -58,20 +59,24 @@ func WriteOutputTask(inputFile string, outputFile string, makrosToReplace map[st
 	return corpus.ReplaceMakroInCorpusFile(inputFile, outputFile, makrosToReplace, makroRename, alwaysConvertLocalToGlobal, verbose, minify)
 }
 
-func WriteOutput(logData binding.StringList, foundCorpusFiles []string, outputDir string, makroFiles []string, makroOldNameToNewName map[string]string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool, makroRootPath *string, makroMapping corpus.MakroMappings) {
+func WriteOutput(
+	logData binding.StringList,
+	foundCorpusFiles []string,
+	outputDir string,
+	makroFiles []string,
+	makroNamesOverrides []*string,
+	makroOldNameToNewName map[string]string,
+	alwaysConvertLocalToGlobal bool,
+	verbose bool,
+	minify bool,
+	makroRootPath *string,
+	makroMapping corpus.MakroMappings,
+) {
+	// todo someday: capture stdout and print to log window?
 	log.Printf("Generating output to: %s", outputDir)
-	// originalStderr := os.Stderr
-	// // Create a pipe to capture stderr
-	// r, w, err := os.Pipe()
-	// if err != nil {
-	// 	log.Printf("error creating pipe: %s", err)
-	// }
-	// os.Stderr = w
+	// todo makro names are lost...
+	makrosToReplace, err := corpus.ReadMakrosFromCMK(makroFiles, makroNamesOverrides, makroRootPath, makroMapping)
 
-	// todo make panic handler to write to stderr
-
-	// var buf bytes.Buffer
-	makrosToReplace, err := corpus.ReadMakrosFromCMK(makroFiles, makroRootPath, makroMapping)
 	currentLog, _ := logData.Get()
 	if err != nil {
 		log.Println(err)
@@ -191,19 +196,24 @@ func onTappedOutputPopup(a fyne.App, self widget.ToolbarItem, w fyne.Window) fun
 							fileOpenDialog.Show()
 						}),
 						widget.NewButtonWithIcon("Wykonaj", theme.MediaPlayIcon(), func() {
-							macrosTochange := []string{}
+							macroFilesTochange := []string{}
 							macrosToRename := map[string]string{}
 							for i, e := range MacrosToChangeEntries {
-								macrosTochange = append(macrosTochange, e.Text)
+								macroFilesTochange = append(macroFilesTochange, e.Text)
 								if MacrosToChangeReNamesEntriesBool[i].Checked {
 									macrosToRename[MacrosToChangeNamesEntries[i].Text] = MacrosToChangeReNamesEntries[i].Text
 								}
+							}
+							macroNamesOverrides := []*string{}
+							for _, e := range MacrosToChangeNamesEntries {
+								name := string(e.Text)
+								macroNamesOverrides = append(macroNamesOverrides, &name)
 							}
 							alwaysConvertLocalToGlobal := a.Preferences().Bool("alwaysConvertLocalToGlobal")
 							verbose := a.Preferences().Bool("verbose")
 							minify := a.Preferences().Bool("minify")
 							makroRootPath := a.Preferences().String("makroSearchPath")
-							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macrosTochange, macrosToRename, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, corpus.MakroCollectionCache.GetMakroMappings())
+							WriteOutput(logData, foundCorpusFiles, outputPath.Text, macroFilesTochange, macroNamesOverrides, macrosToRename, alwaysConvertLocalToGlobal, verbose, minify, &makroRootPath, corpus.MakroCollectionCache.GetMakroMappings())
 							logWindow.Refresh()
 						}),
 						widget.NewButtonWithIcon("", theme.MoreVerticalIcon(), func() {

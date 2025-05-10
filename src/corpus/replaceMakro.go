@@ -92,7 +92,7 @@ func ReplaceMakroInCorpusFile(inputFile string, outputFile string, makrosToRepla
 	return err
 }
 
-func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
+func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFiles []string, macroNamesOverrides []*string, alwaysConvertLocalToGlobal bool, verbose bool, minify bool) error {
 	inputFolderStat, err := os.Stat(inputFolder)
 	if err != nil {
 		return fmt.Errorf("error reading input folder: %w", err)
@@ -110,7 +110,7 @@ func ReplaceMakroInCorpusFolder(inputFolder string, outputFolder string, makroFi
 	log.Printf("Found %d files in %s", len(foundCorpusFiles), inputFolder)
 
 	// todo support the rest of parameters
-	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, nil, nil)
+	makrosToReplace, err := ReadMakrosFromCMK(makroFiles, macroNamesOverrides, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error reading CMK macros: %w", err)
 	}

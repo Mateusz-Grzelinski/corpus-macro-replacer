@@ -75,7 +75,8 @@ Default logic allows adding "_" prefix to variables that consists only from inte
 		log.Fatalf("output %s already exists. Add --force to override", *output)
 	}
 	if statInput.IsDir() {
-		corpus.ReplaceMakroInCorpusFolder(*input, *output, makroFiles, *alwaysConvertLocalToGlobal, *verbose, *minify) // todo support from cmd line all options
+		macroNamesOverrides := []*string{}
+		corpus.ReplaceMakroInCorpusFolder(*input, *output, makroFiles, macroNamesOverrides, *alwaysConvertLocalToGlobal, *verbose, *minify) // todo support from cmd line all options
 	} else {
 		if errOutput == nil && statOutput.IsDir() || !strings.HasSuffix(strings.ToLower(*output), ".e3d") {
 			var newOutput string = filepath.Join(*output, filepath.Base(*input))

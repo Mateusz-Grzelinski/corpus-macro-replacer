@@ -339,7 +339,9 @@ func getRightPanel(a fyne.App, myWindow *fyne.Window) *widget.Accordion {
 				makroErrorLabel.Show()
 			} else {
 				makroSearchPath := a.Preferences().String("makroSearchPath")
-				newMacroNameEntry.SetText(corpus.GetMacroNameByFileName(makroSearchPath, path, &corpus.MakroCollectionCache))
+				if newMacroNameEntry.Text == "" {
+					newMacroNameEntry.SetText(corpus.GetMacroNameByFileName(makroSearchPath, path, &corpus.MakroCollectionCache))
+				}
 				makroErrorLabel.Importance = widget.MediumImportance
 				makroErrorLabel.Hide()
 				refreshCorpusPreviewFunc()

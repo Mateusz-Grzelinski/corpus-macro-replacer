@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping MakroMappings) (map[string]*M1, error) {
+func ReadMakrosFromCMK(makroFiles []string, makroNamesOverrides []*string, makroRootPath *string, makroMapping MakroMappings) (map[string]*M1, error) {
 	makrosToReplace := map[string]*M1{}
-	for _, makroFile := range makroFiles {
+	for i, makroFile := range makroFiles {
 		absPathMakroFile := strings.SplitN(filepath.Base(makroFile), ".", 2)[0] // this name might be wrong, it can be redefined in software
 		_, exists := makrosToReplace[absPathMakroFile]
 		if exists {
@@ -19,7 +19,11 @@ func ReadMakrosFromCMK(makroFiles []string, makroRootPath *string, makroMapping 
 		if err != nil {
 			return nil, err
 		}
-		makrosToReplace[absPathMakroFile] = makro
+		if len(makroNamesOverrides) > i && makroNamesOverrides[i] != nil {
+			makrosToReplace[*makroNamesOverrides[i]] = makro
+		} else {
+			makrosToReplace[absPathMakroFile] = makro
+		}
 	}
 	return makrosToReplace, nil
 }
