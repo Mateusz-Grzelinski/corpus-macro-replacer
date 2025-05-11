@@ -28,6 +28,16 @@ type ElementFile struct {
 	Element []Element `xml:"ELEMENT"`
 }
 
+func (elementFile *ElementFile) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	// this comment is hard requirement for Corpus format...
+	versionComment := xml.Comment("Ver=" + elementFile.VER.Value)
+	if err := e.EncodeToken(versionComment); err != nil {
+		return err
+	}
+	type Alias ElementFile
+	return e.EncodeElement((*Alias)(elementFile), start)
+}
+
 // does nothing special, only fill in data for children
 func (ef *ElementFile) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	type Alias ElementFile
@@ -47,6 +57,16 @@ func (ef *ElementFile) UnmarshalXML(d *xml.Decoder, start xml.StartElement) erro
 type ProjectFile struct {
 	XMLName xml.Name `xml:"PROJECTFILE"`
 	ElementFile
+}
+
+func (projectFile *ProjectFile) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	// this comment is hard requirement for Corpus format...
+	versionComment := xml.Comment("Ver=" + projectFile.VER.Value)
+	if err := e.EncodeToken(versionComment); err != nil {
+		return err
+	}
+	type Alias ProjectFile
+	return e.EncodeElement((*Alias)(projectFile), start)
 }
 
 // single cabinet

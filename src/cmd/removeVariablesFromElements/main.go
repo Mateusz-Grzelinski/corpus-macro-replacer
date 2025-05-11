@@ -56,6 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Print("Done")
 }
 
 func parseAllfiles(output string, input string, variablesToRemove []string) error {
@@ -135,7 +136,6 @@ type CanWalkElements interface {
 
 func RemoveVariablesFromFile[T CanWalkElements](projectFile T, removePatterns []*regexp.Regexp) (T, error) {
 	RemoveVariablesCallback := func(e *corpus.Element) {
-		log.Printf("Element: %s", e.EName.Value)
 		newAttributes := []xml.Attr{}
 	to_next_attribute:
 		for _, attr := range e.Evar.Attr {
@@ -156,6 +156,7 @@ func RemoveVariablesFromFile[T CanWalkElements](projectFile T, removePatterns []
 			newAttributes = append(newAttributes, xml.Attr{Name: xml.Name{Local: newName}, Value: attr.Value})
 		}
 		if len(newAttributes) != len(e.Evar.Attr) {
+			log.Printf("Element: %s", e.EName.Value)
 			log.Printf("Removed %d/%d variables", len(e.Evar.Attr)-len(newAttributes), len(e.Evar.Attr))
 		}
 		e.Evar.Attr = newAttributes
